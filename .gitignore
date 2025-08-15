@@ -1,0 +1,26 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Node.js dependencies
+node_modules/
+
+# IDE/project settings
+.vscode/
+.idea/
+
+# file that are not used
+rejected.js
+
+#Uploads
+uploads/
+
+#posts
+posts/

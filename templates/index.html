@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Voice Agent</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 2.5rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      width: 100%;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .header .version {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+    }
+
+    .controls {
+      margin-bottom: 2rem;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+
+    button {
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+      min-width: 140px;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      background: linear-gradient(135deg, #9ca3af, #6b7280);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: 0 2px 8px rgba(156, 163, 175, 0.2);
+    }
+
+    .recording-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      color: #ef4444;
+      font-weight: 600;
+      margin: 1rem 0;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+    }
+
+    .recording-indicator.active {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      background: #ef4444;
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+
+    .status-section {
+      margin: 2rem 0;
+    }
+
+    .status-card {
+      background: rgba(37, 99, 235, 0.1);
+      border: 1px solid rgba(37, 99, 235, 0.2);
+      border-radius: 12px;
+      padding: 1rem;
+      margin: 0.8rem 0;
+      color: #1e40af;
+      font-weight: 500;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .status-card.transcript {
+      background: linear-gradient(135deg, #1e40af, #1e3a8a);
+      color: white;
+      font-style: italic;
+      font-size: 1.1rem;
+      text-align: left;
+      min-height: 80px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    .status-card.loading {
+      background: linear-gradient(45deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.2));
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200px 0; }
+      100% { background-position: calc(200px + 100%) 0; }
+    }
+
+    .audio-section {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(37, 99, 235, 0.1);
+    }
+
+    .audio-section h3 {
+      color: #1e40af;
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    audio {
+      width: 100%;
+      border-radius: 12px;
+      background: rgba(37, 99, 235, 0.05);
+      padding: 0.5rem;
+    }
+
+    audio::-webkit-media-controls-panel {
+      background: rgba(37, 99, 235, 0.1);
+      border-radius: 8px;
+    }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 1.5rem;
+        margin: 1rem;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .button-group {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      button {
+        width: 100%;
+        max-width: 250px;
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Echo Bot <span class="version">2.0</span></h1>
+      <p class="subtitle">Ask anything - Your AI voice assistant is ready!</p>
+    </div>
+
+    <div class="controls">
+      <div class="button-group">
+        <button id="start-btn">
+          🎙️ Start Recording
+        </button>
+        <button id="stop-btn" disabled>
+          ⏹️ Stop Recording
+        </button>
+      </div>
+
+      <div id="signal" class="recording-indicator">
+        <div class="pulse-dot"></div>
+        <span>Recording audio...</span>
+      </div>
+    </div>
+
+    <div class="status-section">
+      <div id="upload-status" class="status-card">
+        Ready to record - Click "Start Recording" to begin
+      </div>
+      
+      <div id="trans-status" class="status-card">
+        Waiting for your voice input...
+      </div>
+      
+      <div id="transcript" class="status-card transcript" style="display: none;">
+        Your conversation will appear here...
+      </div>
+    </div>
+
+    <div class="audio-section" id="audio-section" style="display: none;">
+      <h3>🔊 AI Response</h3>
+      <audio id="recorded-audio" controls></audio>
+    </div>
+  </div>
+
+  <script src="../static/script.js">
+    
+  </script>
+</body>
+</html>
