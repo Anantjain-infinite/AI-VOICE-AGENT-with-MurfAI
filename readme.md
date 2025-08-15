@@ -1,4 +1,4 @@
-# Voice AI Agent
+# AI Voice Agent with MurfAI
 
 A conversational AI voice assistant web app that lets you record your voice, transcribes your speech, generates smart replies using Google Gemini, and responds with natural-sounding speech using Murf TTS. The app supports chat history for context-aware conversations.
 
@@ -54,8 +54,7 @@ A conversational AI voice assistant web app that lets you record your voice, tra
 
 ## 📸 Screenshots
 
-> ![Screenshot of the Voice AI Agent UI](posts/day1.PNG)
-> 
+ 
 > ![Another screenshot](posts/day11.PNG)
 
 ---
@@ -106,14 +105,18 @@ uvicorn main:app --reload
 ```
 .
 ├── main.py
+├── schema.py
 ├── .env
-├── requirements.txt
-├── posts/              # Example screenshots/media
 ├── static/
 │   └── script.js       # Frontend JS logic
 ├── templates/
 │   └── index.html      # Main UI
-├── uploads/            # Uploaded audio files
+├── services/
+│   ├── stt.py          # Speech-to-text logic
+│   ├── tts.py          # Text-to-speech logic
+│   └── llm.py          # LLM (Gemini) logic
+├── utils/
+│   └── logger.py       # Logging utility
 └── README.md
 ```
 
@@ -124,8 +127,6 @@ uvicorn main:app --reload
 - `GET /` — Main UI
 - `POST /upload-audio` — Uploads audio file
 - `POST /transcribe/file` — Transcribes uploaded audio
-- `POST /tts/echo` — Echoes back your speech as Murf TTS
-- `POST /llm/query` — Transcribes and generates Gemini response (no chat history)
 - `POST /agent/chat/{session_id}` — Full chat flow: transcribe, chat history, Gemini, Murf TTS
 
 ---
@@ -133,7 +134,6 @@ uvicorn main:app --reload
 ## ⚠️ Notes
 
 - API keys are required for all cloud services.
-- Uploaded audio is stored in the `uploads/` directory.
 - For production, secure your API keys and consider deploying behind HTTPS.
 
 ---
