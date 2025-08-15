@@ -64,13 +64,13 @@ A conversational AI voice assistant web app that lets you record your voice, tra
 ### 1. Clone the repository
 
 ```sh
-git clone https://github.com/yourusername/voice-ai-agent.git
-cd voice-ai-agent
+git clone https://github.com/Anantjain-infinite/AI-VOICE-AGENT-with-MurfAI.git
+cd ai-voice-agent
 ```
 
 ### 2. Install dependencies
 
-Make sure you have Python 3.9+ and Node.js (for frontend development, optional).
+Make sure you have Python 3.9+
 
 ```sh
 python -m venv venv
