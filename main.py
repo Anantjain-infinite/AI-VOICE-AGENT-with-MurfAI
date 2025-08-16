@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File , WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -62,3 +62,12 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
 
     audio_url = murf_tts(llm_reply)
     return {"transcription": transcription, "reply": llm_reply, "audio_url": audio_url}
+
+
+#Route for websockets
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Message text was: {data}")
