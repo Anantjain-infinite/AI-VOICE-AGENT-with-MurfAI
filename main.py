@@ -76,16 +76,24 @@ async def websocket_endpoint(websocket: WebSocket):
     # Create a unique filename with timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = os.path.join(OUTPUT_DIR, f"recording_{timestamp}.webm")
-    print(f"Saving to {filename}")
-
+    logger.info(f"New WebSocket connection started. Saving to {filename}")
     with open(filename, "wb") as f:
         try:
             while True:
-                # Receive raw bytes directly
-                audio_chunk = await websocket.receive_bytes()
-                f.write(audio_chunk)
+                try:
+                
+                    audio_chunk = await websocket.receive_bytes()
+                    f.write(audio_chunk)
 
-        except WebSocketDisconnect:
-            print("Client disconnected")
+                except WebSocketDisconnect:
+                    logger.info("Client disconnected normally")
+                    break
+                except Exception as e:
+                    logger.error(f"Error while receiving audio: {e}", exc_info=True)
+                    break
 
-    print(f"Recording saved: {filename}")
+            logger.info(f"Recording saved successfully: {filename}")
+
+        except Exception as e:
+            logger.error(f"Error handling WebSocket: {e}", exc_info=True)
+            await websocket.close(code=1011) 
