@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File , WebSocket
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File , WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,6 +16,9 @@ load_dotenv()
 
 
 app = FastAPI()
+
+OUTPUT_DIR = "recordings"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 
@@ -65,9 +68,24 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
 
 
 #Route for websockets
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        await websocket.send_text(f"Message text was: {data}")
+
+    # Create a unique filename with timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = os.path.join(OUTPUT_DIR, f"recording_{timestamp}.webm")
+    print(f"Saving to {filename}")
+
+    with open(filename, "wb") as f:
+        try:
+            while True:
+                # Receive raw bytes directly
+                audio_chunk = await websocket.receive_bytes()
+                f.write(audio_chunk)
+
+        except WebSocketDisconnect:
+            print("Client disconnected")
+
+    print(f"Recording saved: {filename}")
