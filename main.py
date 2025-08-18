@@ -11,6 +11,13 @@ from services.stt import transcribe_audio
 from services.tts import murf_tts
 from services.llm import query_llm
 from utils.logger import logger
+import os, asyncio, logging
+from queue import Queue
+import assemblyai as aai
+from assemblyai.streaming.v3 import (
+    StreamingClient, StreamingClientOptions, StreamingParameters, StreamingSessionParameters,
+    StreamingEvents, StreamingError, BeginEvent, TurnEvent, TerminationEvent
+)
 
 load_dotenv()
 
@@ -19,6 +26,8 @@ app = FastAPI()
 
 OUTPUT_DIR = "recordings"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+ASSEMBLY_API_KEY = os.getenv("ASSEMBLY_AI_API_KEY")
+
 
 
 
@@ -68,32 +77,73 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
 
 
 #Route for websockets
+# Event handlers
+def on_turn(self: StreamingClient, event: TurnEvent): 
+        # if event.transcript:
+            # # send only final transcripts back to browser
+            # if event.message_type == "FinalTranscript":
+            #    logger.info(f"[FINAL] {event.transcript}")
+            # else:
+            #     logger.info(f"[PARTIAL] {event.transcript}")
+        if event.end_of_turn  :
+            logger.info(f"Transcript: {event.transcript} (end_of_turn={event.end_of_turn})")
+        if event.end_of_turn and not event.turn_is_formatted:
+            params = StreamingSessionParameters(format_turns=True)
+            self.set_params(params)
+
+def on_begin(self: StreamingClient, event: BeginEvent):
+    logger.info(f"Session started: {event.id}")
+
+
+
+
+def on_terminated(self: StreamingClient, event: TerminationEvent):
+    logger.info(f"Session terminated after {event.audio_duration_seconds:.2f}s")
+    
+
+
+def on_error(self: StreamingClient, error: StreamingError):
+    logger.error(f"Streaming error: {error}")
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    logger.info("WebSocket connected")
 
-    # Create a unique filename with timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = os.path.join(OUTPUT_DIR, f"recording_{timestamp}.webm")
-    logger.info(f"New WebSocket connection started. Saving to {filename}")
-    with open(filename, "wb") as f:
-        try:
-            while True:
-                try:
-                
-                    audio_chunk = await websocket.receive_bytes()
-                    f.write(audio_chunk)
+    
 
-                except WebSocketDisconnect:
-                    logger.info("Client disconnected normally")
-                    break
-                except Exception as e:
-                    logger.error(f"Error while receiving audio: {e}", exc_info=True)
-                    break
 
-            logger.info(f"Recording saved successfully: {filename}")
+    # Create streaming client
+    client = StreamingClient(
+        StreamingClientOptions(
+            api_key=ASSEMBLY_API_KEY,
+            api_host="streaming.assemblyai.com",
+        )
+    )
 
-        except Exception as e:
-            logger.error(f"Error handling WebSocket: {e}", exc_info=True)
-            await websocket.close(code=1011) 
+    # Register event handlers
+    client.on(StreamingEvents.Begin, on_begin)
+    client.on(StreamingEvents.Turn, on_turn)
+    client.on(StreamingEvents.Termination, on_terminated)
+    client.on(StreamingEvents.Error, on_error)
+
+    client.connect(
+        StreamingParameters(
+            sample_rate=16000,
+            format_turns=True,
+        )
+    )
+
+    try:
+        while True:
+            audio_chunk = await websocket.receive_bytes()
+            client.stream(audio_chunk)
+
+    except WebSocketDisconnect:
+        logger.info("Client disconnected")
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+    finally:
+        client.disconnect(terminate=True)
+        logger.info("Streaming session closed")
