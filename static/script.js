@@ -79,6 +79,8 @@ function floatTo16BitPCM(float32Array) {
 async function startStreaming() {
   const startBtn = document.getElementById('start-btn');
   const stopBtn = document.getElementById('stop-btn');
+  const transcriptDiv = document.getElementById("transcript");
+  transcriptDiv.innerText = "Your conversation will appear here...";
 
   startBtn.disabled = true;
   stopBtn.disabled = false;
@@ -88,7 +90,8 @@ async function startStreaming() {
 
   ws.onopen = () => console.log('WS connected');
   ws.onmessage = (evt) => {
-     console.log('[Transcript]', evt.data);
+    console.log('[Transcript]', evt.data);
+    transcriptDiv.innerText += "\n" + evt.data;
   };
   ws.onerror = (e) => {
     console.error('WS error', e);

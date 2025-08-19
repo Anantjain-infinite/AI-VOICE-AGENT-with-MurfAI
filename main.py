@@ -76,53 +76,44 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
     return {"transcription": transcription, "reply": llm_reply, "audio_url": audio_url}
 
 
-#Route for websockets
-# Event handlers
-def on_turn(self: StreamingClient, event: TurnEvent): 
-        # if event.transcript:
-            # # send only final transcripts back to browser
-            # if event.message_type == "FinalTranscript":
-            #    logger.info(f"[FINAL] {event.transcript}")
-            # else:
-            #     logger.info(f"[PARTIAL] {event.transcript}")
-        if event.end_of_turn  :
-            logger.info(f"Transcript: {event.transcript} (end_of_turn={event.end_of_turn})")
-        if event.end_of_turn and not event.turn_is_formatted:
-            params = StreamingSessionParameters(format_turns=True)
-            self.set_params(params)
-
-def on_begin(self: StreamingClient, event: BeginEvent):
-    logger.info(f"Session started: {event.id}")
-
-
-
-
-def on_terminated(self: StreamingClient, event: TerminationEvent):
-    logger.info(f"Session terminated after {event.audio_duration_seconds:.2f}s")
-    
-
-
-def on_error(self: StreamingClient, error: StreamingError):
-    logger.error(f"Streaming error: {error}")
-
-
+#Route: for websockets
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     logger.info("WebSocket connected")
+    connected = True   
 
-    
-
-
-    # Create streaming client
     client = StreamingClient(
         StreamingClientOptions(
             api_key=ASSEMBLY_API_KEY,
             api_host="streaming.assemblyai.com",
         )
     )
+    loop = asyncio.get_event_loop()
 
-    # Register event handlers
+    def on_turn(self: StreamingClient, event: TurnEvent):
+        if event.end_of_turn and event.turn_is_formatted:
+            logger.info(f"[FINAL] Transcript: {event.transcript}")
+            # Send final transcript to browser
+            if connected:
+                loop.call_soon_threadsafe(
+                    asyncio.create_task, websocket.send_text(event.transcript)
+                )
+        # Optional: request formatted turns if needed
+        if event.end_of_turn and not event.turn_is_formatted:
+            params = StreamingSessionParameters(format_turns=True)
+            self.set_params(params)
+
+    def on_begin(self: StreamingClient, event: BeginEvent):
+            logger.info(f"Session started: {event.id}")
+
+    def on_terminated(self: StreamingClient, event: TerminationEvent):
+        logger.info(f"Session terminated after {event.audio_duration_seconds:.2f}s")
+
+    def on_error(self: StreamingClient, error: StreamingError):
+        logger.error(f"Streaming error: {error}")
+
+    # Register async handlers
     client.on(StreamingEvents.Begin, on_begin)
     client.on(StreamingEvents.Turn, on_turn)
     client.on(StreamingEvents.Termination, on_terminated)
@@ -142,8 +133,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")
+   
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
+   
     finally:
+        connected = False   
         client.disconnect(terminate=True)
         logger.info("Streaming session closed")
