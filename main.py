@@ -5,6 +5,9 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+from google import genai
+from google.genai import types
+
 
 from schema import TTSRequest, TTSResponse, LLMResponse, ChatResponse
 from services.stt import transcribe_audio
@@ -90,15 +93,48 @@ async def websocket_endpoint(websocket: WebSocket):
         )
     )
     loop = asyncio.get_event_loop()
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Configure Gemini client
+    gemini_client = genai.Client()
+    chat = gemini_client.chats.create(model="gemini-2.5-flash",
+                                      config=types.GenerateContentConfig(system_instruction="Keep your response short and to the point")
+                                      
+                                      )  
+
+    async def stream_gemini_response(transcript: str):
+        logger.info(f"Sending transcript to Gemini: {transcript}")
+        try:
+            final_text = ""
+            # Stream Gemini response
+            
+            response = chat.send_message_stream(transcript)
+
+            for chunk in response:
+                if chunk.text:
+                    # print(chunk.text, end="", flush=True)
+                    final_text += chunk.text
+
+            print("\n--- Gemini Response Begin ---\n")   
+
+            logger.info(f"Gemini Final Response: {final_text}")
+
+            print("\n--- Gemini Response End ---\n")
+
+        except Exception as e:
+            logger.error(f"Error while streaming Gemini response: {e}", exc_info=True)
 
     def on_turn(self: StreamingClient, event: TurnEvent):
-        if event.end_of_turn and event.turn_is_formatted:
+        if event.end_of_turn and event.turn_is_formatted and connected:
             logger.info(f"[FINAL] Transcript: {event.transcript}")
             # Send final transcript to browser
             if connected:
                 loop.call_soon_threadsafe(
                     asyncio.create_task, websocket.send_text(event.transcript)
                 )
+                loop.create_task(stream_gemini_response(event.transcript))
+
+
         # Optional: request formatted turns if needed
         if event.end_of_turn and not event.turn_is_formatted:
             params = StreamingSessionParameters(format_turns=True)
