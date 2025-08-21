@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 import os
 from google import genai
 from google.genai import types
-
-
+import websockets
+import json
 from schema import TTSRequest, TTSResponse, LLMResponse, ChatResponse
 from services.stt import transcribe_audio
 from services.tts import murf_tts
@@ -30,6 +30,8 @@ app = FastAPI()
 OUTPUT_DIR = "recordings"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 ASSEMBLY_API_KEY = os.getenv("ASSEMBLY_AI_API_KEY")
+MURF_API_KEY = os.getenv("MURF_API_KEY")
+MURF_WS_URL = "wss://api.murf.ai/v1/speech/stream-input"
 
 
 
@@ -95,12 +97,45 @@ async def websocket_endpoint(websocket: WebSocket):
     loop = asyncio.get_event_loop()
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Configure Gemini client
+    # Configure Gemini client
     gemini_client = genai.Client()
     chat = gemini_client.chats.create(model="gemini-2.5-flash",
                                       config=types.GenerateContentConfig(system_instruction="Keep your response short and to the point")
                                       
                                       )  
+
+    async def stream_murf_tts(text: str):
+        """Send text to Murf via WebSocket and print base64 audio output."""
+        async with websockets.connect(
+            f"{MURF_WS_URL}?api-key={MURF_API_KEY}&sample_rate=44100&channel_type=MONO&format=WAV"
+        ) as ws:
+            # Send voice config
+            voice_config_msg = {
+                "voice_config": {
+                    "voiceId": "en-US-amara",
+                    "style": "Conversational",
+                    "rate": 0,
+                    "pitch": 0,
+                    "variation": 1,
+                }
+            }
+            await ws.send(json.dumps(voice_config_msg))
+
+            # Send text
+            text_msg = {"text": text, "end": True}
+            await ws.send(json.dumps(text_msg))
+
+            try:
+                while True:
+                    response = await ws.recv()
+                    data = json.loads(response)
+                    if "audio" in data:
+                        print(f"Murf audio (base64): {data['audio'][:60]}...")  # truncated
+                    if data.get("final"):
+                        break
+            except Exception as e:
+                logger.error(f"Murf streaming error: {e}", exc_info=True)
+
 
     async def stream_gemini_response(transcript: str):
         logger.info(f"Sending transcript to Gemini: {transcript}")
@@ -120,6 +155,10 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.info(f"Gemini Final Response: {final_text}")
 
             print("\n--- Gemini Response End ---\n")
+
+            # Step 2: Send to Murf via WebSocket
+            await stream_murf_tts(final_text)
+
 
         except Exception as e:
             logger.error(f"Error while streaming Gemini response: {e}", exc_info=True)
