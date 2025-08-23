@@ -5,6 +5,8 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+import time
+import random
 from google import genai
 from google.genai import types
 import websockets
@@ -99,101 +101,170 @@ async def websocket_endpoint(websocket: WebSocket):
 
     # Configure Gemini client
     gemini_client = genai.Client()
-    chat = gemini_client.chats.create(model="gemini-2.5-flash",
-                                      config=types.GenerateContentConfig(system_instruction="Keep your response short and to the point")
-                                      
-                                      )  
+    chat = gemini_client.chats.create(
+        model="gemini-2.5-flash",
+        config=types.GenerateContentConfig(
+            system_instruction="Keep your response short and to the point. Be conversational and helpful."
+        )
+    )  
+
+    # Generate unique context ID for this conversation
+    context_id = f"ctx_{int(time.time())}_{random.randint(1000, 9999)}"
+    logger.info(f"Generated context ID: {context_id}")
 
     async def stream_murf_tts(text: str):
-        """Send text to Murf via WebSocket and print base64 audio output."""
-        async with websockets.connect(
-            f"{MURF_WS_URL}?api-key={MURF_API_KEY}&sample_rate=44100&channel_type=MONO&format=WAV"
-        ) as ws:
-            # Send voice config
-            voice_config_msg = {
-                "voice_config": {
-                    "voiceId": "en-US-amara",
-                    "style": "Conversational",
-                    "rate": 0,
-                    "pitch": 0,
-                    "variation": 1,
+        """Send text to Murf via WebSocket and stream base64 audio to the client."""
+        try:
+            async with websockets.connect(
+                f"{MURF_WS_URL}?api-key={MURF_API_KEY}&sample_rate=44100&channel_type=MONO&format=WAV"
+            ) as murf_ws:
+                
+                # Send voice config first
+                voice_config_msg = {
+                    "voice_config": {
+                        "voiceId": "en-US-amara",
+                        "style": "Conversational",
+                        "rate": 0,
+                        "pitch": 0,
+                        "variation": 1,
+                    },
+                    "context_id": context_id
                 }
-            }
-            await ws.send(json.dumps(voice_config_msg))
+                await murf_ws.send(json.dumps(voice_config_msg))
+                logger.info(f"Sent voice config with context_id: {context_id}")
 
-            # Send text
-            text_msg = {"text": text, "end": True}
-            await ws.send(json.dumps(text_msg))
+                # Send text with context_id
+                text_msg = {
+                    "text": text, 
+                    "context_id": context_id,
+                    "end": True  # Close context after this message
+                }
+                await murf_ws.send(json.dumps(text_msg))
+                logger.info(f"Sent text to Murf: {text[:50]}...")
 
-            try:
+                audio_chunks_received = 0
+                first_chunk = True
+
                 while True:
-                    response = await ws.recv()
-                    data = json.loads(response)
-                    if "audio" in data:
-                        print(f"Murf audio (base64): {data['audio'][:60]}...")  # truncated
-                    if data.get("final"):
-                        break
-            except Exception as e:
-                logger.error(f"Murf streaming error: {e}", exc_info=True)
+                    try:
+                        response = await asyncio.wait_for(murf_ws.recv(), timeout=30.0)
+                        data = json.loads(response)
+                        
+                        if "audio" in data:
+                            audio_chunks_received += 1
+                            chunk = data["audio"]
+                            
+                            # Send audio chunk to client immediately
+                            await websocket.send_json({
+                                "audio_chunk": chunk,
+                                "chunk_number": audio_chunks_received,
+                                "first_chunk": first_chunk
+                            })
+                            
+                            logger.info(f"Sent audio chunk #{audio_chunks_received} to client")
+                            first_chunk = False
 
+                        # Check for final audio signal
+                        if data.get("final") or data.get("isFinalAudio"):
+                            # Send final status to client
+                            await websocket.send_json({
+                                "status": "final_audio",
+                                "total_chunks": audio_chunks_received,
+                                "context_id": context_id
+                            })
+                            logger.info(f"Final audio sent. Total chunks: {audio_chunks_received}")
+                            break
+                            
+                        # Additional check for request completion
+                        if data.get("requestId"):
+                            logger.info(f"Received request ID: {data.get('requestId')}")
+                            
+                    except asyncio.TimeoutError:
+                        logger.warning("Timeout waiting for Murf response")
+                        break
+                    except websockets.exceptions.ConnectionClosed:
+                        logger.warning("Murf WebSocket connection closed")
+                        break
+
+        except Exception as e:
+            logger.error(f"Murf streaming error: {e}", exc_info=True)
+            await websocket.send_json({
+                "status": "error",
+                "message": "Audio generation failed",
+                "context_id": context_id
+            })
 
     async def stream_gemini_response(transcript: str):
         logger.info(f"Sending transcript to Gemini: {transcript}")
         try:
             final_text = ""
-            # Stream Gemini response
             
+            # Stream Gemini response
             response = chat.send_message_stream(transcript)
 
             for chunk in response:
                 if chunk.text:
-                    # print(chunk.text, end="", flush=True)
                     final_text += chunk.text
-
-            print("\n--- Gemini Response Begin ---\n")   
 
             logger.info(f"Gemini Final Response: {final_text}")
 
-            print("\n--- Gemini Response End ---\n")
-
-            # Step 2: Send to Murf via WebSocket
-            await stream_murf_tts(final_text)
-
+            # Send the complete response to Murf TTS
+            if final_text.strip():
+                await stream_murf_tts(final_text.strip())
+            else:
+                logger.warning("Empty response from Gemini")
+                await websocket.send_json({
+                    "status": "error",
+                    "message": "No response generated",
+                    "context_id": context_id
+                })
 
         except Exception as e:
             logger.error(f"Error while streaming Gemini response: {e}", exc_info=True)
+            await websocket.send_json({
+                "status": "error",
+                "message": "AI response generation failed",
+                "context_id": context_id
+            })
 
     def on_turn(self: StreamingClient, event: TurnEvent):
         if event.end_of_turn and event.turn_is_formatted and connected:
             logger.info(f"[FINAL] Transcript: {event.transcript}")
+            
             # Send final transcript to browser
-            if connected:
+            if connected and event.transcript.strip():
                 loop.call_soon_threadsafe(
-                    asyncio.create_task, websocket.send_text(event.transcript)
+                    asyncio.create_task, 
+                    websocket.send_text(event.transcript)
                 )
-                loop.create_task(stream_gemini_response(event.transcript))
+                
+                # Generate AI response
+                loop.call_soon_threadsafe(
+                    asyncio.create_task,
+                    stream_gemini_response(event.transcript)
+                )
 
-
-        # Optional: request formatted turns if needed
+        # Request formatted turns if needed
         if event.end_of_turn and not event.turn_is_formatted:
             params = StreamingSessionParameters(format_turns=True)
             self.set_params(params)
 
     def on_begin(self: StreamingClient, event: BeginEvent):
-            logger.info(f"Session started: {event.id}")
+        logger.info(f"AssemblyAI session started: {event.id}")
 
     def on_terminated(self: StreamingClient, event: TerminationEvent):
-        logger.info(f"Session terminated after {event.audio_duration_seconds:.2f}s")
+        logger.info(f"AssemblyAI session terminated after {event.audio_duration_seconds:.2f}s")
 
     def on_error(self: StreamingClient, error: StreamingError):
-        logger.error(f"Streaming error: {error}")
+        logger.error(f"AssemblyAI streaming error: {error}")
 
-    # Register async handlers
+    # Register event handlers
     client.on(StreamingEvents.Begin, on_begin)
     client.on(StreamingEvents.Turn, on_turn)
     client.on(StreamingEvents.Termination, on_terminated)
     client.on(StreamingEvents.Error, on_error)
 
+    # Start AssemblyAI streaming
     client.connect(
         StreamingParameters(
             sample_rate=16000,
@@ -203,7 +274,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
+            # Receive audio data from frontend
             audio_chunk = await websocket.receive_bytes()
+            
+            # Stream to AssemblyAI for transcription
             client.stream(audio_chunk)
 
     except WebSocketDisconnect:
