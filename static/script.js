@@ -8,6 +8,20 @@ let playheadTime = 0;
 let wavHeaderProcessed = false;
 let contextId = null;
 
+
+function getOrCreateSessionId() {
+  const url = new URL(window.location.href);
+  let sid = url.searchParams.get("session_id");
+  if (!sid) {
+    sid = crypto.randomUUID();
+    url.searchParams.set("session_id", sid);
+    window.history.replaceState({}, "", url.toString());
+  }
+  return sid;
+}
+
+const sessionId = getOrCreateSessionId();
+
 function downsampleTo16k(float32Buffer, inputSampleRate) {
   if (inputSampleRate === 16000) return float32Buffer;
 
@@ -365,7 +379,7 @@ async function startStreaming() {
   updateStatus('trans-status', 'Initializing speech recognition...', true);
   updateTranscript('Listening for your voice...');
 
-  ws = new WebSocket("ws://127.0.0.1:8000/ws");
+  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}`);
   ws.binaryType = 'arraybuffer';
 
   const receivedAudioChunks = []; // Store for final audio player

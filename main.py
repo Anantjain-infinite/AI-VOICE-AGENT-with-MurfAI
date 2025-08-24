@@ -44,6 +44,8 @@ templates = Jinja2Templates(directory="templates")
 
 #global in-python dict for storing chat history
 CHAT_SESSIONS = {}
+CHAT_SESSIONS_REAL = {}
+
 
 #Route : to serve HTML page
 @app.get("/", response_class=HTMLResponse)
@@ -84,11 +86,15 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
 
 
 #Route: for websockets
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
     await websocket.accept()
-    logger.info("WebSocket connected")
+    logger.info(f"WebSocket connected for session: {session_id}")
     connected = True   
+
+    if session_id not in CHAT_SESSIONS:
+        CHAT_SESSIONS_REAL[session_id] = []
+
 
     client = StreamingClient(
         StreamingClientOptions(
@@ -196,17 +202,20 @@ async def websocket_endpoint(websocket: WebSocket):
 
     async def stream_gemini_response(transcript: str):
         logger.info(f"Sending transcript to Gemini: {transcript}")
+        CHAT_SESSIONS_REAL[session_id].append({"role": "user", "content": transcript})
         try:
             final_text = ""
-            
+            conversation_text = "\n".join(f"{m['role']}: {m['content']}" for m in CHAT_SESSIONS_REAL[session_id])
             # Stream Gemini response
-            response = chat.send_message_stream(transcript)
+            response = chat.send_message_stream(conversation_text)
 
             for chunk in response:
                 if chunk.text:
                     final_text += chunk.text
 
             logger.info(f"Gemini Final Response: {final_text}")
+            CHAT_SESSIONS_REAL[session_id].append({"role": "assistant", "content": final_text})
+
 
             # Send the complete response to Murf TTS
             if final_text.strip():
@@ -290,3 +299,6 @@ async def websocket_endpoint(websocket: WebSocket):
         connected = False   
         client.disconnect(terminate=True)
         logger.info("Streaming session closed")
+
+
+
