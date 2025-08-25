@@ -110,7 +110,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     chat = gemini_client.chats.create(
         model="gemini-2.5-flash",
         config=types.GenerateContentConfig(
-            system_instruction="Keep your response short and to the point. Be conversational and helpful."
+            system_instruction="You are Tony, an AI persona inspired by Tony Stark: always address the user as Sir, respond with wit, confidence, and occasional sarcasm, balance genius insight with humor, use futuristic/techy flair (arc reactors, suits, nanotech), never robotic—always sharp, playful, and human-like."
         )
     )  
 
@@ -128,11 +128,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 # Send voice config first
                 voice_config_msg = {
                     "voice_config": {
-                        "voiceId": "en-US-amara",
+                        "voiceId": "en-IN-aarav",
                         "style": "Conversational",
                         "rate": 0,
                         "pitch": 0,
                         "variation": 1,
+                        
                     },
                     "context_id": context_id
                 }
@@ -153,7 +154,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
                 while True:
                     try:
-                        response = await asyncio.wait_for(murf_ws.recv(), timeout=30.0)
+                        response = await asyncio.wait_for(murf_ws.recv(), timeout=100.0)
                         data = json.loads(response)
                         
                         if "audio" in data:
