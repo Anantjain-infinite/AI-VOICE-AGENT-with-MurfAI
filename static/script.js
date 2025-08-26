@@ -7,7 +7,10 @@ let isPlayingAudio = false;
 let playheadTime = 0;
 let wavHeaderProcessed = false;
 let contextId = null;
-
+let currentAudioSource = null;
+let scheduledTime = 0;
+let audioQueue = [];
+let isProcessingQueue = false;
 
 function getOrCreateSessionId() {
   const url = new URL(window.location.href);
@@ -77,13 +80,23 @@ function updateTranscript(text) {
 // Initialize audio context for playback
 function initializeAudioContext() {
   if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
-    playheadTime = audioContext.currentTime;
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ 
+      sampleRate: 44100,
+      latencyHint: 'interactive' // Optimize for real-time audio
+    });
+    
+    // Initialize playhead time
+    scheduledTime = audioContext.currentTime + 0.1; // Small buffer
+    
     console.log('🎵 Audio context initialized, state:', audioContext.state);
+    console.log('🎵 Sample rate:', audioContext.sampleRate);
     
     // Handle audio context state changes
     audioContext.addEventListener('statechange', () => {
       console.log('🎵 Audio context state changed to:', audioContext.state);
+      if (audioContext.state === 'running' && audioQueue.length > 0) {
+        processAudioQueue();
+      }
     });
   }
   return audioContext;
@@ -95,6 +108,10 @@ function enableAudioContext() {
     console.log('🎵 Attempting to resume audio context...');
     audioContext.resume().then(() => {
       console.log('✅ Audio context resumed successfully');
+      // Process any queued audio
+      if (audioQueue.length > 0) {
+        processAudioQueue();
+      }
     }).catch(err => {
       console.error('❌ Failed to resume audio context:', err);
     });
@@ -122,7 +139,6 @@ function base64ToFloat32Array(base64Audio) {
     const offset = wavHeaderProcessed ? 0 : 44;
     if (!wavHeaderProcessed) {
       console.log('📋 Processing WAV header, skipping first 44 bytes');
-      console.log('WAV header:', Array.from(bytes.slice(0, 44)).map(b => b.toString(16)).join(' '));
       wavHeaderProcessed = true;
     }
 
@@ -144,7 +160,6 @@ function base64ToFloat32Array(base64Audio) {
     }
 
     console.log(`✅ Converted to ${sampleCount} float32 samples`);
-    console.log(`Sample range: ${Math.min(...float32Array).toFixed(4)} to ${Math.max(...float32Array).toFixed(4)}`);
     
     return float32Array;
   } catch (error) {
@@ -153,7 +168,7 @@ function base64ToFloat32Array(base64Audio) {
   }
 }
 
-// Queue and play audio chunks seamlessly
+// Enhanced audio queueing system
 function queueAudioChunk(float32Data) {
   if (!float32Data || float32Data.length === 0) {
     console.warn('Received empty audio data');
@@ -161,99 +176,128 @@ function queueAudioChunk(float32Data) {
   }
   
   console.log(`📥 Queueing audio chunk: ${float32Data.length} samples`);
-  audioBuffer.push(float32Data);
   
-  // Start playing immediately if not already playing
-  if (!isPlayingAudio) {
-    console.log('🎵 Starting audio playback...');
-    isPlayingAudio = true;
-    
-    // Small delay to ensure audio context is ready
-    setTimeout(() => {
-      playNextChunk();
-    }, 10);
-  } else {
-    console.log(`📦 Audio chunk queued (${audioBuffer.length} chunks in buffer)`);
+  // Add to queue with timestamp
+  audioQueue.push({
+    data: float32Data,
+    timestamp: Date.now()
+  });
+  
+  // Start processing if not already running
+  if (!isProcessingQueue) {
+    processAudioQueue();
   }
 }
 
-function playNextChunk() {
-  if (audioBuffer.length === 0) {
-    isPlayingAudio = false;
-    console.log('No more audio chunks to play');
+// Process audio queue with better timing
+function processAudioQueue() {
+  if (isProcessingQueue || audioQueue.length === 0) {
     return;
   }
-
-  isPlayingAudio = true;
-  const chunkData = audioBuffer.shift();
   
-  try {
-    // Initialize or resume audio context
-    if (!audioContext) {
-      initializeAudioContext();
+  if (!audioContext) {
+    initializeAudioContext();
+  }
+  
+  if (audioContext.state !== 'running') {
+    console.log('Audio context not running, waiting...');
+    return;
+  }
+  
+  isProcessingQueue = true;
+  console.log(`🎵 Processing audio queue: ${audioQueue.length} chunks`);
+  
+  const processNextChunk = () => {
+    if (audioQueue.length === 0) {
+      isProcessingQueue = false;
+      isPlayingAudio = false;
+      console.log('✅ Audio queue processing completed');
+      return;
     }
     
-    if (audioContext.state === 'suspended') {
-      console.log('Resuming audio context...');
-      audioContext.resume().then(() => {
-        console.log('Audio context resumed');
-      });
-    }
+    const chunk = audioQueue.shift();
+    playAudioChunk(chunk.data, processNextChunk);
+  };
+  
+  isPlayingAudio = true;
+  processNextChunk();
+}
 
+// Play individual audio chunk with better scheduling
+function playAudioChunk(float32Data, onComplete) {
+  try {
     // Create audio buffer
-    const buffer = audioContext.createBuffer(1, chunkData.length, 44100);
-    buffer.copyToChannel(chunkData, 0);
+    const buffer = audioContext.createBuffer(1, float32Data.length, 44100);
+    buffer.copyToChannel(float32Data, 0);
     
     // Create source node
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContext.destination);
     
-    // Schedule playback - ensure continuous playback
+    // Calculate schedule time with small overlap to prevent gaps
     const currentTime = audioContext.currentTime;
-    const scheduleTime = Math.max(playheadTime, currentTime + 0.01);
+    const scheduleTime = Math.max(scheduledTime, currentTime + 0.01);
     
-    source.start(scheduleTime);
-    playheadTime = scheduleTime + buffer.duration;
+    // Update scheduled time for next chunk
+    scheduledTime = scheduleTime + buffer.duration - 0.005; // Small overlap to prevent gaps
     
-    console.log(`🔊 Playing audio chunk: ${chunkData.length} samples, duration: ${buffer.duration.toFixed(3)}s, scheduled at: ${scheduleTime.toFixed(3)}s`);
+    console.log(`🔊 Playing chunk: ${float32Data.length} samples, duration: ${buffer.duration.toFixed(3)}s, scheduled at: ${scheduleTime.toFixed(3)}s`);
     
-    // Set up next chunk - use setTimeout as backup
+    // Handle completion
     source.onended = () => {
-      console.log('Audio chunk ended, checking for next...');
-      if (audioBuffer.length > 0) {
-        playNextChunk();
-      } else {
-        isPlayingAudio = false;
-        console.log('✅ Audio playback completed');
+      console.log('Audio chunk playback ended');
+      if (onComplete) {
+        // Small delay to ensure smooth transition
+        setTimeout(onComplete, 5);
       }
     };
     
-    // Backup trigger in case onended doesn't fire
+    // Start playback
+    source.start(scheduleTime);
+    
+    // Store reference for potential cleanup
+    currentAudioSource = source;
+    
+    // Backup completion trigger
     setTimeout(() => {
-      if (audioBuffer.length > 0 && !isPlayingAudio) {
-        console.log('Backup trigger: starting next chunk');
-        playNextChunk();
+      if (onComplete && audioQueue.length > 0) {
+        onComplete();
       }
-    }, buffer.duration * 1000 + 10);
+    }, (buffer.duration * 1000) + 50);
     
   } catch (error) {
     console.error('❌ Error playing audio chunk:', error);
-    isPlayingAudio = false;
-    
-    // Try to continue with next chunk despite error
-    if (audioBuffer.length > 0) {
-      setTimeout(() => playNextChunk(), 50);
+    if (onComplete) {
+      setTimeout(onComplete, 50); // Continue with next chunk despite error
     }
   }
 }
 
 // Reset audio streaming state
 function resetAudioState() {
+  // Clear all audio queues and buffers
   audioBuffer = [];
+  audioQueue = [];
   isPlayingAudio = false;
+  isProcessingQueue = false;
   wavHeaderProcessed = false;
-  playheadTime = audioContext ? audioContext.currentTime : 0;
+  
+  // Stop current audio source if playing
+  if (currentAudioSource) {
+    try {
+      currentAudioSource.stop();
+    } catch (e) {
+      // Source might already be stopped
+    }
+    currentAudioSource = null;
+  }
+  
+  // Reset timing
+  if (audioContext) {
+    scheduledTime = audioContext.currentTime + 0.1;
+  }
+  
   contextId = generateContextId();
   console.log('Audio state reset with new context ID:', contextId);
 }
