@@ -12,6 +12,8 @@ from google import genai
 from google.genai import types
 import websockets
 import json
+import config
+from config import GEMINI_API_KEY , ASSEMBLY_AI_API_KEY , MURF_API_KEY
 from schema import TTSRequest, TTSResponse, LLMResponse, ChatResponse
 from services.stt import transcribe_audio
 from services.tts import murf_tts
@@ -28,12 +30,13 @@ from assemblyai.streaming.v3 import (
 load_dotenv()
 
 
+
 app = FastAPI()
 
 OUTPUT_DIR = "recordings"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-ASSEMBLY_API_KEY = os.getenv("ASSEMBLY_AI_API_KEY")
-MURF_API_KEY = os.getenv("MURF_API_KEY")
+ASSEMBLY_API_KEY = ASSEMBLY_AI_API_KEY
+MURF_API_KEY = MURF_API_KEY
 MURF_WS_URL = "wss://api.murf.ai/v1/speech/stream-input"
 
 
@@ -46,6 +49,30 @@ templates = Jinja2Templates(directory="templates")
 #global in-python dict for storing chat history
 CHAT_SESSIONS = {}
 CHAT_SESSIONS_REAL = {}
+
+
+@app.post("/get-api-keys")
+async def set_api_keys(request: Request):
+
+    try:
+        data = await request.json()
+
+        # Client-provided keys (or None if not provided)
+        key1 = data.get("api_key_1")
+        key2 = data.get("api_key_2")
+        key3 = data.get("api_key_3")
+        key4 = data.get("api_key_4")
+        key5 = data.get("api_key_5")
+        key6 = data.get("api_key_6")
+
+        # Update global keys (fallback to existing ones in config)
+        config.set_api_keys(key1 , key2 , key3, key4 , key5, key6)
+
+        return {
+        "success" :"true"
+        }
+    except Exception as e:
+            logger.error(f"Error while configuration: {e}", exc_info=True)
 
 
 #Route : to serve HTML page
@@ -105,7 +132,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         )
     )
     loop = asyncio.get_event_loop()
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    GEMINI_API_KEY = config.GEMINI_API_KEY
 
     # Configure Gemini client with function calling
     gemini_client = genai.Client()

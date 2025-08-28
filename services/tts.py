@@ -1,11 +1,11 @@
 import requests
 import os
 from dotenv import load_dotenv
-
+from config import MURF_API_KEY
 
 load_dotenv()
 
-MURF_API_KEY = os.getenv("MURF_API_KEY")
+MURF_API_KEY = MURF_API_KEY
 MURF_TTS_URL = "https://api.murf.ai/v1/speech/generate"
 
 def murf_tts(text: str, voice_id="en-IN-rohan", fmt="MP3", style=None) -> str:

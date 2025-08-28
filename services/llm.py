@@ -2,10 +2,10 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 import os
-
+from config import GEMINI_API_KEY
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = GEMINI_API_KEY
 
 def query_llm(messages: list) -> str:
     conversation_text = "\n".join(f"{m['role']}: {m['content']}" for m in messages)

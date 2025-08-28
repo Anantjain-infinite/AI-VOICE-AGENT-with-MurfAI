@@ -1,3 +1,44 @@
+//api config and side bar handling
+function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("active");
+      console.log("clicked")
+    }
+ document.getElementById("apiform").addEventListener("submit", function(e) {
+      e.preventDefault(); // prevent page reload
+
+      const apiKey1 = document.getElementById("input1").value;
+      const apiKey2 = document.getElementById("input2").value;
+      const apiKey3 = document.getElementById("input3").value;
+      const apiKey4 = document.getElementById("input4").value;
+      const apiKey5 = document.getElementById("input5").value;
+      const apiKey6 = document.getElementById("input6").value;
+
+      fetch("http://127.0.0.1:8000/get-api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key_1: apiKey1,
+          api_key_2: apiKey2,
+          api_key_3: apiKey3,
+          api_key_4: apiKey4,
+          api_key_5: apiKey5,
+          api_key_6: apiKey6
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("response").textContent = "Configuration successfull";
+      })
+      .catch(err => console.error("Error:", err));
+    });
+
+
+document.getElementById("toggle-btn").addEventListener("click", toggleSidebar);
+
+
+//Audio processing logic
+
+
 let ws, audioCtx, processor, source, stream;
 
 // Audio streaming variables

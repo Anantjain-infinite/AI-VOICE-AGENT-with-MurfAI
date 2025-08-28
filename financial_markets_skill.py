@@ -10,8 +10,9 @@ import google.generativeai as gena
 from google.genai import types
 from google import genai
 from utils.logger import logger
+from config import FINNHUB_API_KEY , GEMINI_API_KEY , OPENWEATHER_API_KEY , ALPHA_VANTAGE_API_KEY
 
-WEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")  # Get free API key from openweathermap.org
+WEATHER_API_KEY = OPENWEATHER_API_KEY
 WEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5"
 
 @dataclass
@@ -51,8 +52,8 @@ class NewsItem:
 class FinancialMarketsController:
     def __init__(self):
         # Multiple API keys for redundancy and rate limiting
-        self.alpha_vantage_key = os.getenv("ALPHA_VANTAGE_API_KEY")
-        self.finnhub_key = os.getenv("FINNHUB_API_KEY")
+        self.alpha_vantage_key = ALPHA_VANTAGE_API_KEY
+        self.finnhub_key = FINNHUB_API_KEY
         self.polygon_key = os.getenv("POLYGON_API_KEY")
         self.coinmarketcap_key = os.getenv("COINMARKETCAP_API_KEY")
         self.twelvedata_key = os.getenv("TWELVEDATA_API_KEY")
