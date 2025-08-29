@@ -13,7 +13,7 @@ function toggleSidebar() {
       const apiKey5 = document.getElementById("input5").value;
       const apiKey6 = document.getElementById("input6").value;
 
-      fetch("http://127.0.0.1:8000/get-api-keys", {
+      fetch(`http://${window.location.host}/get-api-keys`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -460,11 +460,15 @@ async function startStreaming() {
   enableAudioContext(); // Ensure audio context is active
   resetAudioState();
 
+  const wsUrl = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ? `ws://127.0.0.1:8000/ws/${sessionId}`
+  : `wss://${window.location.host}/ws/${sessionId}`;
+      
   updateStatus('upload-status', '🔄 Connecting to server...', true);
   updateStatus('trans-status', 'Initializing speech recognition...', true);
   updateTranscript('Listening for your voice...');
 
-  ws = new WebSocket(`ws://127.0.0.1:8000/ws/${sessionId}`);
+  ws = new WebSocket(wsUrl);
   ws.binaryType = 'arraybuffer';
 
   const receivedAudioChunks = []; // Store for final audio player
