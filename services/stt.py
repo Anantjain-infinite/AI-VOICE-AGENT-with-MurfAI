@@ -1,10 +1,10 @@
 import assemblyai as aai
 import os
 from dotenv import load_dotenv
-
+from config import ASSEMBLY_AI_API_KEY
 load_dotenv()
 
-aai.settings.api_key = os.getenv("ASSEMBLY_AI_API_KEY")
+aai.settings.api_key = ASSEMBLY_AI_API_KEY
 
 def transcribe_audio(audio_bytes: bytes) -> str:
     config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.best)

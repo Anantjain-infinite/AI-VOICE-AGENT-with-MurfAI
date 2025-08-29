@@ -20,6 +20,65 @@
       justify-content: center;
       padding: 1rem;
     }
+    
+    /* Sidebar styling */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -320px; /* hidden by default */
+      width: 320px;
+      height: 100%;
+      background: #fffafa;
+      color: rgb(114, 124, 209);
+      padding: 20px;
+      transition: left 0.3s ease;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+    }
+
+    .sidebar.active {
+      left: 0; /* slide in */
+    }
+    .sub{
+      background: blue;
+      color: white;
+      margin-top: 1rem;
+    }
+
+    .sidebar h2 {
+      margin-top: 0;
+      text-align: center;
+    }
+
+    .sidebar form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar label {
+      margin-top: 10px;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .sidebar input[type="text"] {
+      padding: 8px;
+      border: 2px solid blue;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    /* Toggle button */
+    .toggle-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: #ffffff;
+      color: rgb(33, 52, 105);
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
 
     .container {
       background: rgba(255, 255, 255, 0.95);
@@ -234,6 +293,37 @@
   </style>
 </head>
 <body>
+
+    <!-- Toggle button -->
+  <button class="toggle-btn" id="toggle-btn" >☰ Configure</button>
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <h2>Configure Your Keys</h2>
+    <form id="apiform">
+      <label for="input1">MURF AI Key</label>
+      <input type="text" id="input1" placeholder="Enter key" required>
+
+      <label for="input2">Assembly AI key</label>
+      <input type="text" id="input2" placeholder="Enter key" required>
+
+      <label for="input3">Google Gemini Key</label>
+      <input type="text" id="input3" placeholder="Enter key" required>
+
+      <label for="input4">Finnhub Key</label>
+      <input type="text" id="input4" placeholder="Enter key" required>
+
+      <label for="input5">Alpha vantage Key</label>
+      <input type="text" id="input5" placeholder="Enter key" required>
+
+      <label for="input6">OpenWeather Key</label>
+      <input type="text" id="input6" placeholder="Enter key" required>
+
+      <button class="sub" type="submit">Send keys</button>
+    </form>
+  </div>
+
+
   <div class="container">
     <div class="header">
       <h1>Echo Bot <span class="version">2.0</span></h1>
@@ -265,7 +355,7 @@
         Waiting for your voice input...
       </div>
       
-      <div id="transcript" class="status-card transcript" style="display: none;">
+      <div id="transcript" class="status-card transcript" style="display: block;">
         Your conversation will appear here...
       </div>
     </div>
@@ -277,7 +367,9 @@
   </div>
 
   <script src="../static/script.js">
-    
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("active");
+    }
   </script>
 </body>
 </html>
