@@ -261,24 +261,108 @@
       vertical-align: middle;
     }
 
+    @media (max-width: 900px) {
+      .container {
+        max-width: 98vw;
+        padding: 1.2rem;
+        margin: 0.5rem;
+      }
+      .sidebar {
+        width: 90vw;
+        left: -90vw;
+      }
+      .sidebar.active {
+        left: 0;
+      }
+      .toggle-btn {
+        left: 10px;
+        top: 10px;
+        padding: 8px 12px;
+      }
+    }
+
     @media (max-width: 640px) {
       .container {
-        padding: 1.5rem;
-        margin: 1rem;
+        padding: 1rem;
+        margin: 0.2rem;
+        border-radius: 10px;
       }
-
       .header h1 {
-        font-size: 2rem;
+        font-size: 1.4rem;
       }
-
+      .sidebar {
+        width: 100vw;
+        left: -100vw;
+        padding: 12px;
+      }
+      .sidebar.active {
+        left: 0;
+      }
+      .sidebar h2 {
+        font-size: 1.1rem;
+      }
+      .sidebar label {
+        font-size: 13px;
+      }
+      .sidebar input[type="text"] {
+        font-size: 13px;
+        padding: 6px;
+      }
+      .sub {
+        font-size: 14px;
+        padding: 8px 0;
+      }
+      .toggle-btn {
+        font-size: 1rem;
+        padding: 7px 10px;
+      }
       .button-group {
         flex-direction: column;
-        align-items: center;
+        gap: 0.7rem;
       }
-
       button {
         width: 100%;
-        max-width: 250px;
+        min-width: unset;
+        font-size: 0.98rem;
+        padding: 0.8rem 0.5rem;
+      }
+      .status-section {
+        margin: 1rem 0;
+      }
+      .status-card {
+        font-size: 0.98rem;
+        min-height: 38px;
+        padding: 0.7rem;
+      }
+      .status-card.transcript {
+        font-size: 1rem;
+        min-height: 60px;
+      }
+      .audio-section {
+        margin-top: 1rem;
+        padding-top: 1rem;
+      }
+      .audio-section h3 {
+        font-size: 1rem;
+      }
+      audio {
+        min-width: 0;
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .container {
+        padding: 0.5rem;
+      }
+      .sidebar {
+        padding: 6px;
+      }
+      .header h1 {
+        font-size: 1rem;
+      }
+      .audio-section h3 {
+        font-size: 0.95rem;
       }
     }
 
@@ -299,7 +383,24 @@
 
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
-    <h2>Configure Your Keys</h2>
+    <div class="sidebar-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+      <h2 style="margin: 0; font-size: 1.3rem; flex: 1;">Configure Your Keys</h2>
+      <button id="close-sidebar-btn" aria-label="Close sidebar"
+        style="
+          background: none;
+          border: none;
+          font-size: 2rem;
+          color: #1e40af;
+          cursor: pointer;
+          padding: 0 4px;
+          line-height: 1;
+          margin-left: 8px;
+          transition: color 0.2s;
+        "
+        onmouseover="this.style.color='#ef4444'"
+        onmouseout="this.style.color='#1e40af'"
+      >×</button>
+    </div>
     <form id="apiform">
       <label for="input1">MURF AI Key</label>
       <input type="text" id="input1" placeholder="Enter key" required>
@@ -366,10 +467,12 @@
     </div>
   </div>
 
-  <script src="../static/script.js">
-    function toggleSidebar() {
-      document.getElementById("sidebar").classList.toggle("active");
-    }
+  <script src="../static/script.js"></script>
+  <script>
+    // Sidebar close button logic
+    document.getElementById("close-sidebar-btn").onclick = function() {
+      document.getElementById("sidebar").classList.remove("active");
+    };
   </script>
 </body>
 </html>

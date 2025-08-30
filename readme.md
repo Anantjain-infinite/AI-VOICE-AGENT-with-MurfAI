@@ -39,6 +39,7 @@ A full-stack conversational AI voice assistant web app. Record your voice in the
 - **Backend:** FastAPI endpoints for audio upload, transcription, LLM chat, TTS, and a WebSocket endpoint for real-time streaming.
 - **Session Management:** Each browser session gets a unique `session_id` for chat history and context.
 - **Skills:** Financial data (stocks, crypto, news, portfolio), weather, and more via Gemini function calling.
+- **API Key Configuration:** Users must configure API keys via the sidebar before using the agent. The UI prevents recording until all keys are set.
 
 ---
 
@@ -54,6 +55,9 @@ A full-stack conversational AI voice assistant web app. Record your voice in the
 - ⚡ **Modern UI** with real-time status updates and error handling
 - 🔐 **API key configuration** via sidebar (no hardcoding in frontend)
 - 🕒 **Streaming architecture** for low-latency, interactive conversations
+- 🚫 **Recording disabled until API keys are configured** (with user alert and sidebar auto-open)
+- ✅ **Confirmation dialog before submitting API keys**
+- 🎉 **Sidebar form hides and shows a success message after successful configuration**
 
 ---
 

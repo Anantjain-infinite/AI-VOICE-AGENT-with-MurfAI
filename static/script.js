@@ -6,6 +6,11 @@ function toggleSidebar() {
  document.getElementById("apiform").addEventListener("submit", function(e) {
       e.preventDefault(); // prevent page reload
 
+      // Confirmation before sending keys
+      if (!confirm("Are you sure you want to configure these API keys? (Agent will not work if API keys are wrong)")) {
+        return;
+      }
+
       const apiKey1 = document.getElementById("input1").value;
       const apiKey2 = document.getElementById("input2").value;
       const apiKey3 = document.getElementById("input3").value;
@@ -27,7 +32,19 @@ function toggleSidebar() {
       })
       .then(res => res.json())
       .then(data => {
-        document.getElementById("response").textContent = "Configuration successfull";
+        // Hide the form and show a success message
+        document.getElementById("apiform").style.display = "none";
+        let msg = document.getElementById("api-success-message");
+        if (!msg) {
+          msg = document.createElement("div");
+          msg.id = "api-success-message";
+          msg.style = "color:green;font-weight:bold;margin-top:1rem;text-align:center;";
+          document.getElementById("sidebar").appendChild(msg);
+        }
+        msg.textContent = "API keys configured successfully!";
+        if (areApiKeysFilled()) {
+          apiKeysConfigured = true;
+        }
       })
       .catch(err => console.error("Error:", err));
     });
@@ -52,6 +69,9 @@ let currentAudioSource = null;
 let scheduledTime = 0;
 let audioQueue = [];
 let isProcessingQueue = false;
+
+// Track API key configuration status
+let apiKeysConfigured = false;
 
 function getOrCreateSessionId() {
   const url = new URL(window.location.href);
@@ -602,8 +622,65 @@ async function stopStreaming() {
   updateStatus('upload-status', '✅ Recording stopped');
 }
 
+// Check if all API key fields are filled
+function areApiKeysFilled() {
+  return (
+    document.getElementById("input1").value.trim() &&
+    document.getElementById("input2").value.trim() &&
+    document.getElementById("input3").value.trim() &&
+    document.getElementById("input4").value.trim() &&
+    document.getElementById("input5").value.trim() &&
+    document.getElementById("input6").value.trim()
+  );
+}
+
+// On API key form submit, set flag if all keys are filled
+document.getElementById("apiform").addEventListener("submit", function(e) {
+  e.preventDefault(); // prevent page reload
+
+  const apiKey1 = document.getElementById("input1").value;
+  const apiKey2 = document.getElementById("input2").value;
+  const apiKey3 = document.getElementById("input3").value;
+  const apiKey4 = document.getElementById("input4").value;
+  const apiKey5 = document.getElementById("input5").value;
+  const apiKey6 = document.getElementById("input6").value;
+
+  fetch("http://127.0.0.1:8000/get-api-keys", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key_1: apiKey1,
+      api_key_2: apiKey2,
+      api_key_3: apiKey3,
+      api_key_4: apiKey4,
+      api_key_5: apiKey5,
+      api_key_6: apiKey6
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("response").textContent = "Configuration successfull";
+    if (areApiKeysFilled()) {
+      apiKeysConfigured = true;
+    }
+  })
+  .catch(err => console.error("Error:", err));
+});
+
+
+// Prevent recording if API keys are not configured
+document.getElementById('start-btn').onclick = function() {
+  if (!apiKeysConfigured || !areApiKeysFilled()) {
+    alert("Please configure your API key first");
+    // Optionally, open the sidebar for user convenience
+    document.getElementById("sidebar").classList.add("active");
+    return;
+  }
+  startStreaming();
+};
+
 // Event listeners
-document.getElementById('start-btn').onclick = startStreaming;
+// document.getElementById('start-btn').onclick = startStreaming;
 document.getElementById('stop-btn').onclick = stopStreaming;
 
 // Add click handler to enable audio context on any user interaction

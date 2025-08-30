@@ -99,9 +99,13 @@ async def transcribe_file(file: UploadFile = File(...)):
 
 #Route: for generating response from LLM
 @app.post("/agent/chat/{session_id}", response_model=ChatResponse)
-async def agent_chat(session_id: str, file: UploadFile = File(...)):
+async def agent_chat(session_id: str, file: UploadFile = File(...), request: Request = None):
     audio_bytes = await file.read()
     transcription = transcribe_audio(audio_bytes)
+
+    # Log user IP with transcript
+    user_ip = request.client.host if request and request.client else "unknown"
+    logger.info(f"Transcript from IP {user_ip}: {transcription}")
 
     if session_id not in CHAT_SESSIONS:
         CHAT_SESSIONS[session_id] = []
@@ -121,6 +125,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     logger.info(f"WebSocket connected for session: {session_id}")
     connected_flag = {"value": True}
 
+    # Log IP address on connection
+    user_ip = getattr(websocket.client, "host", "unknown")
+    logger.info(f"WebSocket session {session_id} from IP {user_ip}")
+
     if session_id not in CHAT_SESSIONS_REAL:
         CHAT_SESSIONS_REAL[session_id] = []
 
@@ -132,6 +140,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     logger.info(f"Generated context ID: {context_id}")
 
     async def stream_gemini_response(transcript: str):
+        # Log user IP with transcript for streaming
+        logger.info(f"Transcript from IP {user_ip}: {transcript}")
         try:
             await process_gemini_response(
                 session_id,
