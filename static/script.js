@@ -18,7 +18,7 @@ function toggleSidebar() {
       const apiKey5 = document.getElementById("input5").value;
       const apiKey6 = document.getElementById("input6").value;
 
-      fetch(`http://${window.location.host}/get-api-keys`, {
+      fetch(`https://${window.location.host}/get-api-keys`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
