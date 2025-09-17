@@ -670,12 +670,12 @@ document.getElementById("apiform").addEventListener("submit", function(e) {
 
 // Prevent recording if API keys are not configured
 document.getElementById('start-btn').onclick = function() {
-  if (!apiKeysConfigured || !areApiKeysFilled()) {
-    alert("Please configure your API key first");
-    // Optionally, open the sidebar for user convenience
-    document.getElementById("sidebar").classList.add("active");
-    return;
-  }
+  // if (!apiKeysConfigured || !areApiKeysFilled()) {
+  //   alert("Please configure your API key first");
+  //   // Optionally, open the sidebar for user convenience
+  //   document.getElementById("sidebar").classList.add("active");
+  //   return;
+  // }
   startStreaming();
 };
 
