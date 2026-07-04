@@ -44,6 +44,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
+@app.get("/health")
+async def health_check():
+    """Lightweight endpoint for uptime monitors (UptimeRobot, etc.) — avoids
+    hitting the full UI/template render or a DB query just to check liveness."""
+    return {"status": "ok"}
+
 @app.on_event("startup")
 def on_startup():
     db.init_db()
