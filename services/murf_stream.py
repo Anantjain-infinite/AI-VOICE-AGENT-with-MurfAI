@@ -1,11 +1,10 @@
 import json
-import logging
-import websockets
 import asyncio
-
+import websockets
 from utils.logger import logger
 
-async def stream_murf_tts(text: str, websocket, murf_ws_url, murf_api_key, context_id):
+
+async def stream_murf_tts(text: str, websocket, murf_ws_url: str, murf_api_key: str, context_id: str):
     try:
         async with websockets.connect(
             f"{murf_ws_url}?api-key={murf_api_key}&sample_rate=44100&channel_type=MONO&format=WAV"
