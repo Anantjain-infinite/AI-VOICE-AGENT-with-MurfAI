@@ -117,12 +117,12 @@ class FinancialMarketsController:
                 return StockData(
                     symbol=symbol,
                     price=quote_data["c"],
-                    change=quote_data["d"],
-                    change_percent=quote_data["dp"],
+                    change=quote_data.get("d") or 0.0,
+                    change_percent=quote_data.get("dp") or 0.0,
                     volume=0,
                     market_cap=profile_data.get("marketCapitalization"),
-                    day_high=quote_data["h"],
-                    day_low=quote_data["l"],
+                    day_high=quote_data.get("h") or None,
+                    day_low=quote_data.get("l") or None,
                 )
         except Exception as e:
             logger.error(f"Finnhub API error: {e}")
@@ -342,16 +342,19 @@ async def get_stock_price(symbol: str) -> str:
     if not stock_data:
         return f"Sorry, I couldn't retrieve data for {symbol.upper()}. The market might be closed or the symbol might be invalid."
 
-    change_direction = "📈" if stock_data.change >= 0 else "📉"
-    change_text = "up" if stock_data.change >= 0 else "down"
+    change = stock_data.change or 0.0
+    change_percent = stock_data.change_percent or 0.0
+
+    change_direction = "📈" if change >= 0 else "📉"
+    change_text = "up" if change >= 0 else "down"
 
     response = f"**{symbol.upper()} - ${stock_data.price:.2f}** {change_direction}\n"
-    response += f"Change: ${stock_data.change:+.2f} ({stock_data.change_percent:+.2f}%)\n"
+    response += f"Change: ${change:+.2f} ({change_percent:+.2f}%)\n"
     if stock_data.market_cap:
         response += f"Market Cap: ${stock_data.market_cap/1000:.1f}B\n"
     if stock_data.day_high and stock_data.day_low:
         response += f"Day Range: ${stock_data.day_low:.2f} - ${stock_data.day_high:.2f}\n"
-    response += f"\n{symbol.upper()} is {change_text} {abs(stock_data.change_percent):.2f}% today."
+    response += f"\n{symbol.upper()} is {change_text} {abs(change_percent):.2f}% today."
     return response
 
 
@@ -438,15 +441,17 @@ async def compare_stocks(symbols: str) -> str:
     if not comparisons:
         return "I couldn't retrieve data for any of those symbols."
 
-    comparisons.sort(key=lambda x: x.change_percent, reverse=True)
+    comparisons.sort(key=lambda x: x.change_percent or 0.0, reverse=True)
     response = "**Stock Comparison:**\n\n"
     for i, stock in enumerate(comparisons, 1):
-        direction = "📈" if stock.change >= 0 else "📉"
+        change = stock.change or 0.0
+        change_percent = stock.change_percent or 0.0
+        direction = "📈" if change >= 0 else "📉"
         response += f"**{i}. {stock.symbol}** - ${stock.price:.2f} {direction}\n"
-        response += f"   Change: ${stock.change:+.2f} ({stock.change_percent:+.2f}%)\n\n"
+        response += f"   Change: ${change:+.2f} ({change_percent:+.2f}%)\n\n"
 
     best, worst = comparisons[0], comparisons[-1]
-    response += f"**{best.symbol}** is leading with {best.change_percent:+.2f}%, while **{worst.symbol}** is trailing at {worst.change_percent:+.2f}%."
+    response += f"**{best.symbol}** is leading with {(best.change_percent or 0.0):+.2f}%, while **{worst.symbol}** is trailing at {(worst.change_percent or 0.0):+.2f}%."
     return response
 
 

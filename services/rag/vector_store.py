@@ -2,8 +2,10 @@
 ChromaDB wrapper: one collection per chat session, so a user's uploaded
 documents are only ever retrieved within their own session.
 """
+import math
 import chromadb
 from google import genai
+from google.genai import types
 import config
 from utils.logger import logger
 
@@ -29,9 +31,23 @@ def get_collection(session_id: str):
 
 
 def embed_text(text: str) -> list[float]:
+    """
+    Uses gemini-embedding-001 (text-embedding-004 was deprecated by Google on
+    Jan 14, 2026). output_dimensionality=768 keeps vectors smaller/faster for
+    Google's docs note gemini-embedding-001 does NOT pre-normalize its output
+    when a non-default output_dimensionality is requested (unlike the newer
+    gemini-embedding-2), so we L2-normalize manually for correct similarity
+    ranking.
+    """
     client = genai.Client()
-    result = client.models.embed_content(model=config.EMBEDDING_MODEL, contents=text)
-    return result.embeddings[0].values
+    result = client.models.embed_content(
+        model=config.EMBEDDING_MODEL,
+        contents=text,
+        config=types.EmbedContentConfig(output_dimensionality=768),
+    )
+    values = result.embeddings[0].values
+    norm = math.sqrt(sum(v * v for v in values)) or 1.0
+    return [v / norm for v in values]
 
 
 def add_chunks(session_id: str, doc_id: str, filename: str, chunks: list[dict]):

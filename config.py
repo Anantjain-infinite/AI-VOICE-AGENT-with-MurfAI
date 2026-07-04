@@ -23,7 +23,7 @@ RAG_TOP_K = int(os.getenv("RAG_TOP_K", "4"))
 MEMORY_FACT_LIMIT = int(os.getenv("MEMORY_FACT_LIMIT", "15"))
 CHAT_HISTORY_LIMIT = int(os.getenv("CHAT_HISTORY_LIMIT", "20"))
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-2.5-flash")
 
 
