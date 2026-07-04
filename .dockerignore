@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.env
+app_data.db
+chroma_db/
+uploads/pdfs/*
+recordings/*
+!uploads/pdfs/.gitkeep
+!recordings/.gitkeep
+.DS_Store
+*.zip

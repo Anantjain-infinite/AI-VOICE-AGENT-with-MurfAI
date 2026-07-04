@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: signal-voice-agent
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: MURF_API_KEY
+        sync: false
+      - key: ASSEMBLY_AI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: DB_PATH
+        value: /data/app_data.db
+      - key: CHROMA_PATH
+        value: /data/chroma_db
+      - key: UPLOAD_DIR
+        value: /data/uploads/pdfs
+    disk:
+      name: signal-data
+      mountPath: /data
+      sizeGB: 1

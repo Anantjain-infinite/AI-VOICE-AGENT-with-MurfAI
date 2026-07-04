@@ -1,478 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Voice Agent</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    
-    /* Sidebar styling */
-    .sidebar {
-      position: fixed;
-      top: 0;
-      left: -320px; /* hidden by default */
-      width: 320px;
-      height: 100%;
-      background: #fffafa;
-      color: rgb(114, 124, 209);
-      padding: 20px;
-      transition: left 0.3s ease;
-      box-shadow: 2px 0 8px rgba(0,0,0,0.3);
-    }
-
-    .sidebar.active {
-      left: 0; /* slide in */
-    }
-    .sub{
-      background: blue;
-      color: white;
-      margin-top: 1rem;
-    }
-
-    .sidebar h2 {
-      margin-top: 0;
-      text-align: center;
-    }
-
-    .sidebar form {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .sidebar label {
-      margin-top: 10px;
-      margin-bottom: 5px;
-      font-size: 14px;
-    }
-
-    .sidebar input[type="text"] {
-      padding: 8px;
-      border: 2px solid blue;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-
-    /* Toggle button */
-    .toggle-btn {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background: #ffffff;
-      color: rgb(33, 52, 105);
-      border: none;
-      padding: 10px 15px;
-      cursor: pointer;
-      border-radius: 4px;
-    }
-
-    .container {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 20px;
-      padding: 2.5rem;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-      max-width: 600px;
-      width: 100%;
-      text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .header {
-      margin-bottom: 2rem;
-    }
-
-    .header h1 {
-      background: linear-gradient(135deg, #2563eb, #1e40af);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      font-size: 2.5rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-
-    .header .version {
-      color: #ef4444;
-      font-weight: 600;
-    }
-
-    .subtitle {
-      color: #64748b;
-      font-size: 1.1rem;
-      margin-bottom: 2rem;
-    }
-
-    .controls {
-      margin-bottom: 2rem;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      margin-bottom: 1.5rem;
-    }
-
-    button {
-      background: linear-gradient(135deg, #2563eb, #1e40af);
-      color: white;
-      border: none;
-      padding: 1rem 2rem;
-      border-radius: 50px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
-      min-width: 140px;
-    }
-
-    button:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
-    }
-
-    button:active:not(:disabled) {
-      transform: translateY(0);
-    }
-
-    button:disabled {
-      background: linear-gradient(135deg, #9ca3af, #6b7280);
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: 0 2px 8px rgba(156, 163, 175, 0.2);
-    }
-
-    .recording-indicator {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      color: #ef4444;
-      font-weight: 600;
-      margin: 1rem 0;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.3s ease;
-    }
-
-    .recording-indicator.active {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .pulse-dot {
-      width: 12px;
-      height: 12px;
-      background: #ef4444;
-      border-radius: 50%;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.2); }
-    }
-
-    .status-section {
-      margin: 2rem 0;
-    }
-
-    .status-card {
-      background: rgba(37, 99, 235, 0.1);
-      border: 1px solid rgba(37, 99, 235, 0.2);
-      border-radius: 12px;
-      padding: 1rem;
-      margin: 0.8rem 0;
-      color: #1e40af;
-      font-weight: 500;
-      min-height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-
-    .status-card.transcript {
-      background: linear-gradient(135deg, #1e40af, #1e3a8a);
-      color: white;
-      font-style: italic;
-      font-size: 1.1rem;
-      text-align: left;
-      min-height: 80px;
-      white-space: pre-wrap;
-      line-height: 1.5;
-    }
-
-    .status-card.loading {
-      background: linear-gradient(45deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.2));
-      animation: shimmer 1.5s ease-in-out infinite;
-    }
-
-    @keyframes shimmer {
-      0% { background-position: -200px 0; }
-      100% { background-position: calc(200px + 100%) 0; }
-    }
-
-    .audio-section {
-      margin-top: 2rem;
-      padding-top: 2rem;
-      border-top: 1px solid rgba(37, 99, 235, 0.1);
-    }
-
-    .audio-section h3 {
-      color: #1e40af;
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
-      font-weight: 600;
-    }
-
-    audio {
-      width: 100%;
-      border-radius: 12px;
-      background: rgba(37, 99, 235, 0.05);
-      padding: 0.5rem;
-    }
-
-    audio::-webkit-media-controls-panel {
-      background: rgba(37, 99, 235, 0.1);
-      border-radius: 8px;
-    }
-
-    .icon {
-      width: 20px;
-      height: 20px;
-      margin-right: 0.5rem;
-      vertical-align: middle;
-    }
-
-    @media (max-width: 900px) {
-      .container {
-        max-width: 98vw;
-        padding: 1.2rem;
-        margin: 0.5rem;
-      }
-      .sidebar {
-        width: 90vw;
-        left: -90vw;
-      }
-      .sidebar.active {
-        left: 0;
-      }
-      .toggle-btn {
-        left: 10px;
-        top: 10px;
-        padding: 8px 12px;
-      }
-    }
-
-    @media (max-width: 640px) {
-      .container {
-        padding: 1rem;
-        margin: 0.2rem;
-        border-radius: 10px;
-      }
-      .header h1 {
-        font-size: 1.4rem;
-      }
-      .sidebar {
-        width: 100vw;
-        left: -100vw;
-        padding: 12px;
-      }
-      .sidebar.active {
-        left: 0;
-      }
-      .sidebar h2 {
-        font-size: 1.1rem;
-      }
-      .sidebar label {
-        font-size: 13px;
-      }
-      .sidebar input[type="text"] {
-        font-size: 13px;
-        padding: 6px;
-      }
-      .sub {
-        font-size: 14px;
-        padding: 8px 0;
-      }
-      .toggle-btn {
-        font-size: 1rem;
-        padding: 7px 10px;
-      }
-      .button-group {
-        flex-direction: column;
-        gap: 0.7rem;
-      }
-      button {
-        width: 100%;
-        min-width: unset;
-        font-size: 0.98rem;
-        padding: 0.8rem 0.5rem;
-      }
-      .status-section {
-        margin: 1rem 0;
-      }
-      .status-card {
-        font-size: 0.98rem;
-        min-height: 38px;
-        padding: 0.7rem;
-      }
-      .status-card.transcript {
-        font-size: 1rem;
-        min-height: 60px;
-      }
-      .audio-section {
-        margin-top: 1rem;
-        padding-top: 1rem;
-      }
-      .audio-section h3 {
-        font-size: 1rem;
-      }
-      audio {
-        min-width: 0;
-        width: 100%;
-      }
-    }
-
-    @media (max-width: 400px) {
-      .container {
-        padding: 0.5rem;
-      }
-      .sidebar {
-        padding: 6px;
-      }
-      .header h1 {
-        font-size: 1rem;
-      }
-      .audio-section h3 {
-        font-size: 0.95rem;
-      }
-    }
-
-    .fade-in {
-      animation: fadeIn 0.5s ease-in;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Signal — AI Voice Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../static/css/style.css">
 </head>
 <body>
 
-    <!-- Toggle button -->
-  <button class="toggle-btn" id="toggle-btn" >☰ Configure</button>
+  <div class="app-shell">
 
-  <!-- Sidebar -->
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-      <h2 style="margin: 0; font-size: 1.3rem; flex: 1;">Configure Your Keys</h2>
-      <button id="close-sidebar-btn" aria-label="Close sidebar"
-        style="
-          background: none;
-          border: none;
-          font-size: 2rem;
-          color: #1e40af;
-          cursor: pointer;
-          padding: 0 4px;
-          line-height: 1;
-          margin-left: 8px;
-          transition: color 0.2s;
-        "
-        onmouseover="this.style.color='#ef4444'"
-        onmouseout="this.style.color='#1e40af'"
-      >×</button>
-    </div>
-    <form id="apiform">
-      <label for="input1">MURF AI Key</label>
-      <input type="text" id="input1" placeholder="Enter key" required>
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" id="brand-mark"></span>
+        <div class="brand-text">
+          <span class="brand-name">Signal</span>
+          <span class="brand-sub">voice agent · rag · memory</span>
+        </div>
+      </div>
 
-      <label for="input2">Assembly AI key</label>
-      <input type="text" id="input2" placeholder="Enter key" required>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="voice">Voice</button>
+        <button class="tab" data-tab="documents">Documents</button>
+        <button class="tab" data-tab="memory">Memory</button>
+      </nav>
 
-      <label for="input3">Google Gemini Key</label>
-      <input type="text" id="input3" placeholder="Enter key" required>
+      <button class="keys-btn" id="toggle-keys-btn">
+        <span class="dot" id="keys-dot"></span> Configure keys
+      </button>
+    </header>
 
-      <label for="input4">Finnhub Key</label>
-      <input type="text" id="input4" placeholder="Enter key" required>
+    <!-- API keys drawer -->
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+    <aside class="drawer" id="keys-drawer">
+      <div class="drawer-head">
+        <h2>API Keys</h2>
+        <button class="icon-btn" id="close-drawer-btn" aria-label="Close">×</button>
+      </div>
+      <p class="drawer-hint">Stored server-side for this process only. Nothing is written to the frontend.</p>
+      <form id="apiform">
+        <label for="input1">Murf AI</label>
+        <input type="text" id="input1" placeholder="Murf API key" required>
 
-      <label for="input5">Alpha vantage Key</label>
-      <input type="text" id="input5" placeholder="Enter key" required>
+        <label for="input2">AssemblyAI</label>
+        <input type="text" id="input2" placeholder="AssemblyAI API key" required>
 
-      <label for="input6">OpenWeather Key</label>
-      <input type="text" id="input6" placeholder="Enter key" required>
+        <label for="input3">Google Gemini</label>
+        <input type="text" id="input3" placeholder="Gemini API key" required>
 
-      <button class="sub" type="submit">Send keys</button>
-    </form>
+        <label for="input4">Finnhub</label>
+        <input type="text" id="input4" placeholder="Finnhub API key" required>
+
+        <label for="input5">Alpha Vantage</label>
+        <input type="text" id="input5" placeholder="Alpha Vantage API key" required>
+
+        <label for="input6">OpenWeather</label>
+        <input type="text" id="input6" placeholder="OpenWeather API key" required>
+
+        <button class="primary-btn" type="submit">Save keys</button>
+        <div id="api-success-message" class="success-msg" style="display:none;">Keys configured ✓</div>
+      </form>
+    </aside>
+
+    <!-- ================= VOICE PANEL ================= -->
+    <main class="panel active" id="panel-voice">
+      <section class="voice-card">
+        <div class="voice-card-head">
+          <h1>Talk to your agent</h1>
+          <p>Live speech, tool calls for stocks &amp; weather, and memory of past sessions.</p>
+        </div>
+
+        <canvas id="waveform" width="640" height="120"></canvas>
+
+        <div class="controls-row">
+          <button id="start-btn" class="rec-btn">
+            <span class="rec-icon"></span> Start
+          </button>
+          <button id="stop-btn" class="rec-btn stop" disabled>
+            <span class="stop-icon"></span> Stop
+          </button>
+          <div class="signal-indicator" id="signal">
+            <span class="pulse-dot"></span> Listening
+          </div>
+        </div>
+
+        <div class="status-grid">
+          <div class="status-card" id="upload-status">Ready — click Start to begin</div>
+          <div class="status-card" id="trans-status">Waiting for your voice input…</div>
+        </div>
+
+        <div class="transcript-card" id="transcript">Your conversation will appear here…</div>
+
+        <div class="audio-section" id="audio-section" style="display:none;">
+          <h3>Response audio</h3>
+          <audio id="recorded-audio" controls></audio>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= DOCUMENTS PANEL (RAG) ================= -->
+    <main class="panel" id="panel-documents">
+      <section class="docs-layout">
+        <div class="docs-upload-card">
+          <h1>Ask your documents</h1>
+          <p>Upload a PDF, then ask questions grounded in its contents — answers cite the page they came from.</p>
+
+          <label class="dropzone" id="dropzone" for="pdf-input">
+            <span class="dropzone-icon">＋</span>
+            <span class="dropzone-text">Drop a PDF here or click to browse</span>
+            <input type="file" id="pdf-input" accept="application/pdf" hidden>
+          </label>
+
+          <div id="upload-progress" class="upload-progress" style="display:none;">Indexing document…</div>
+
+          <h2 class="section-label">Indexed documents</h2>
+          <ul class="doc-list" id="doc-list">
+            <li class="doc-empty">No documents uploaded yet.</li>
+          </ul>
+        </div>
+
+        <div class="docs-chat-card">
+          <div class="docs-chat-log" id="docs-chat-log">
+            <div class="docs-chat-empty">Ask something about your uploaded PDF — e.g. "What's the refund policy on page 2?"</div>
+          </div>
+          <form id="docs-chat-form" class="docs-chat-form">
+            <input type="text" id="docs-question" placeholder="Ask a question about your documents…" autocomplete="off">
+            <button type="submit" class="primary-btn">Ask</button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================= MEMORY PANEL ================= -->
+    <main class="panel" id="panel-memory">
+      <section class="memory-layout">
+        <div class="memory-head">
+          <h1>What Signal remembers</h1>
+          <p>Facts extracted from past voice sessions, carried forward so the agent doesn't start from zero. Remove anything you'd rather it forgot.</p>
+        </div>
+        <ul class="memory-list" id="memory-list">
+          <li class="memory-empty">No memories yet — they're captured automatically after a voice session ends.</li>
+        </ul>
+        <button class="ghost-btn" id="refresh-memory-btn">Refresh</button>
+      </section>
+    </main>
+
   </div>
 
-
-  <div class="container">
-    <div class="header">
-      <h1>Echo Bot <span class="version">2.0</span></h1>
-      <p class="subtitle">Ask anything - Your AI voice assistant is ready!</p>
-    </div>
-
-    <div class="controls">
-      <div class="button-group">
-        <button id="start-btn">
-          🎙️ Start Recording
-        </button>
-        <button id="stop-btn" disabled>
-          ⏹️ Stop Recording
-        </button>
-      </div>
-
-      <div id="signal" class="recording-indicator">
-        <div class="pulse-dot"></div>
-        <span>Recording audio...</span>
-      </div>
-    </div>
-
-    <div class="status-section">
-      <div id="upload-status" class="status-card">
-        Ready to record - Click "Start Recording" to begin
-      </div>
-      
-      <div id="trans-status" class="status-card">
-        Waiting for your voice input...
-      </div>
-      
-      <div id="transcript" class="status-card transcript" style="display: block;">
-        Your conversation will appear here...
-      </div>
-    </div>
-
-    <div class="audio-section" id="audio-section" style="display: none;">
-      <h3>🔊 AI Response</h3>
-      <audio id="recorded-audio" controls></audio>
-    </div>
-  </div>
-
-  <script src="../static/script.js"></script>
-  <script>
-    // Sidebar close button logic
-    document.getElementById("close-sidebar-btn").onclick = function() {
-      document.getElementById("sidebar").classList.remove("active");
-    };
-  </script>
+  <script src="../static/js/app.js"></script>
+  <script src="../static/js/voice.js"></script>
+  <script src="../static/js/documents.js"></script>
+  <script src="../static/js/memory.js"></script>
 </body>
 </html>
