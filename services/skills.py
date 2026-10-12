@@ -101,7 +101,7 @@ class FinancialMarketsController:
 
     async def _get_finnhub_quote(self, symbol: str) -> Optional[StockData]:
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
                 quote_url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={self.finnhub_key}"
                 async with session.get(quote_url) as response:
                     if response.status != 200:
@@ -131,7 +131,7 @@ class FinancialMarketsController:
     async def _get_alphavantage_quote(self, symbol: str) -> Optional[StockData]:
         try:
             url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={self.alpha_vantage_key}"
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
                 async with session.get(url) as response:
                     if response.status != 200:
                         return None
@@ -155,7 +155,7 @@ class FinancialMarketsController:
     async def _get_polygon_quote(self, symbol: str) -> Optional[StockData]:
         try:
             url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={self.polygon_key}"
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
                 async with session.get(url) as response:
                     if response.status != 200:
                         return None
@@ -200,7 +200,7 @@ class FinancialMarketsController:
         try:
             headers = {"X-CMC_PRO_API_KEY": self.coinmarketcap_key, "Accept": "application/json"}
             url = f"https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol={symbol}"
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
                 async with session.get(url, headers=headers) as response:
                     if response.status != 200:
                         return None
@@ -242,7 +242,7 @@ class FinancialMarketsController:
     async def _get_finnhub_news(self, symbols: Optional[List[str]], limit: int) -> List[NewsItem]:
         try:
             news_items = []
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
                 if symbols:
                     from datetime import timedelta
                     for symbol in symbols[:3]:
@@ -457,7 +457,7 @@ async def compare_stocks(symbols: str) -> str:
 
 async def get_weather_info(location: str, units: str = "metric") -> dict:
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
             url = f"{WEATHER_BASE_URL}/weather"
             params = {"q": location, "appid": config.OPENWEATHER_API_KEY, "units": units}
             async with session.get(url, params=params) as response:
@@ -486,7 +486,7 @@ async def get_weather_info(location: str, units: str = "metric") -> dict:
 
 async def get_weather_forecast(location: str, units: str = "metric") -> dict:
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=4)) as session:
             url = f"{WEATHER_BASE_URL}/forecast"
             params = {"q": location, "appid": config.OPENWEATHER_API_KEY, "units": units}
             async with session.get(url, params=params) as response:

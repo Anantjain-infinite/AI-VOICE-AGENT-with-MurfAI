@@ -23,6 +23,7 @@ You can help with general conversation, and you have live tools available for:
 
 Use those tools whenever a question calls for current data instead of guessing.
 Keep spoken responses natural and reasonably short, since they will be converted to speech.
+If a tool result contains an error, tell the user briefly that live data is unavailable. Never guess numbers.
 """
 
 

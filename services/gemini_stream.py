@@ -16,6 +16,7 @@ Fixes vs the original:
   the in-memory CHAT_SESSIONS_REAL dict.
 """
 import json
+import asyncio
 from google import genai
 from google.genai import types
 from services.skills import tools, handle_financial_function_call
@@ -38,6 +39,25 @@ def create_assistant_chat(client: genai.Client, user_id: str | None = None):
             tools=[tools],
         ),
     )
+
+
+TOOL_TIMEOUT_S = 0.01
+MAX_TOOL_CALLS = 3
+
+async def run_tool_safely(name: str, args: dict, trace):
+    with trace.span(f"tool:{name}"):
+        try:
+            return await asyncio.wait_for(
+                handle_financial_function_call(name, args),
+                timeout=TOOL_TIMEOUT_S,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"Tool {name} timed out after {TOOL_TIMEOUT_S}s")
+            return {"error": "Tool execution timed out",
+                    "details": f"Tool {name} did not complete within {TOOL_TIMEOUT_S} seconds. live data is unavailable."}
+        except Exception as e:
+            logger.error(f"Error running tool {name}: {e}")
+            return {"error": str(e), "details": f"An error occurred while running tool {name}. , live data is unavailable."}
 
 
 async def process_gemini_response(session_id: str, transcript: str, chat, websocket, stream_tts_fn, trace = None):
@@ -66,11 +86,11 @@ async def process_gemini_response(session_id: str, transcript: str, chat, websoc
     trace.mark("llm_done")
 
     if function_calls:
-        results = []
-        for fc in function_calls:
-            with trace.span(f"function_call_{fc['name']}"):
-                result = await handle_financial_function_call(fc["name"], fc["arguments"])
-            results.append({"function_name": fc["name"], "result": result})
+        function_calls = function_calls[:MAX_TOOL_CALLS]
+        outputs = await asyncio.gather(
+            *(run_tool_safely(fc["name"], fc["arguments"], trace) for fc in function_calls))
+        results = [{"function_name": fc["name"], "result": out}
+                for fc, out in zip(function_calls, outputs)]
 
         context = "Function call results:\n" + "\n".join(
             f"- {r['function_name']}: {json.dumps(r['result']) if not isinstance(r['result'], str) else r['result']}"
@@ -100,3 +120,4 @@ async def process_gemini_response(session_id: str, transcript: str, chat, websoc
         await stream_tts_fn(final_text.strip())
     else:
         await websocket.send_json({"status": "error", "message": "No response generated"})
+
