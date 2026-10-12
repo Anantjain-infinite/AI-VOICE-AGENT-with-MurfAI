@@ -7,6 +7,7 @@ import time
 import random
 import uuid
 import asyncio
+from utils.latency import TurnTrace
 
 import config
 from schema import (
@@ -212,6 +213,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     logger.info(f"WebSocket connected for session: {session_id} (user_id={user_id})")
     connected_flag = {"value": True}
 
+    turn_counter = {"n": 0}  # mutable counter for turn IDs
+    turn_lock = asyncio.Lock()  # ensure one turn is processed at a time
     user_ip = getattr(websocket.client, "host", "unknown")
     logger.info(f"WebSocket session {session_id} from IP {user_ip}")
 
@@ -222,28 +225,42 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     context_id = f"ctx_{int(time.time())}_{random.randint(1000, 9999)}"
     logger.info(f"Generated context ID: {context_id}")
 
-    async def on_final_transcript(transcript: str):
+    async def on_final_transcript(transcript: str, eos_t:float | None = None, stt_final_t:float | None = None):
+        turn_counter["n"] += 1
+        trace = TurnTrace(session_id, turn_counter["n"])
+        if eos_t is not None:
+            trace.mark("eos", eos_t)
+        trace.mark("stt_final", stt_final_t)
+        trace.mark("turn_task_started")
+
         logger.info(f"Transcript from IP {user_ip}: {transcript}")
-        try:
-            await process_gemini_response(
-                session_id,
-                transcript,
-                chat,
-                websocket,
-                lambda text, ws=websocket: stream_murf_tts(
-                    text, ws, MURF_WS_URL, config.MURF_API_KEY, context_id
-                ),
-            )
-        except Exception as e:
-            logger.error(f"Error while processing Gemini response: {e}", exc_info=True)
+        async with turn_lock:
+            trace.mark("lock_acquired")
             try:
-                await websocket.send_json({
-                    "status": "error",
-                    "message": "AI response generation failed",
-                    "context_id": context_id,
-                })
-            except Exception:
-                logger.warning("Failed to notify client about Gemini error")
+                await process_gemini_response(
+                    session_id,
+                    transcript,
+                    chat,
+                    websocket,
+                    lambda text, ws=websocket: stream_murf_tts(
+                        text, ws, MURF_WS_URL, config.MURF_API_KEY, context_id, trace = trace
+                    ),
+                    trace = trace,
+                )
+            except Exception as e:
+                logger.error(f"Error while processing Gemini response: {e}", exc_info=True)
+                try:
+                    await websocket.send_json({
+                        "status": "error",
+                        "message": "AI response generation failed",
+                        "context_id": context_id,
+                    })
+                except Exception:
+                    logger.warning("Failed to notify client about Gemini error")
+
+                    pass
+            finally:
+                trace.log()
 
     try:
         client = create_assembly_client(loop, websocket, on_final_transcript, connected_flag)

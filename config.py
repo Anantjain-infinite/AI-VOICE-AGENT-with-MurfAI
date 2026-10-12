@@ -24,7 +24,7 @@ MEMORY_FACT_LIMIT = int(os.getenv("MEMORY_FACT_LIMIT", "15"))
 CHAT_HISTORY_LIMIT = int(os.getenv("CHAT_HISTORY_LIMIT", "20"))
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-2.5-flash")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-3.8-flash")
 
 
 def set_api_keys(key1: str = None, key2: str = None, key3: str = None,

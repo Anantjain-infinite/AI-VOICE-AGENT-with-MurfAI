@@ -2,13 +2,16 @@ import json
 import asyncio
 import websockets
 from utils.logger import logger
+from utils.latency import TurnTrace
 
 
-async def stream_murf_tts(text: str, websocket, murf_ws_url: str, murf_api_key: str, context_id: str):
+async def stream_murf_tts(text: str, websocket, murf_ws_url: str, murf_api_key: str, context_id: str, trace = None):
+    trace = trace or TurnTrace("?", -1)
     try:
         async with websockets.connect(
             f"{murf_ws_url}?api-key={murf_api_key}&sample_rate=44100&channel_type=MONO&format=WAV"
         ) as murf_ws:
+            trace.mark("murf_connected")
             await murf_ws.send(json.dumps({
                 "voice_config": {
                     "voiceId": "en-IN-aarav",
@@ -21,6 +24,7 @@ async def stream_murf_tts(text: str, websocket, murf_ws_url: str, murf_api_key: 
             await murf_ws.send(json.dumps({
                 "text": text, "context_id": context_id, "end": True
             }))
+            trace.mark("murf_text_sent")
 
             chunk_no, first_chunk = 0, True
             while True:
@@ -28,12 +32,14 @@ async def stream_murf_tts(text: str, websocket, murf_ws_url: str, murf_api_key: 
                     resp = await asyncio.wait_for(murf_ws.recv(), timeout=100.0)
                     data = json.loads(resp)
                     if "audio" in data:
+                        trace.mark("tts_first_byte")
                         chunk_no += 1
                         await websocket.send_json({
                             "audio_chunk": data["audio"],
                             "chunk_number": chunk_no,
                             "first_chunk": first_chunk
                         })
+                        trace.mark("first_audio_sent")
                         first_chunk = False
                     if data.get("final") or data.get("isFinalAudio"):
                         await websocket.send_json({
