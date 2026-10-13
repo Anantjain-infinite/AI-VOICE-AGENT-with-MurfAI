@@ -25,6 +25,7 @@ from services import session_store
 import config
 from utils.logger import logger
 from utils.latency import TurnTrace
+from opentelemetry.trace import Status, StatusCode
 
 
 def init_gemini_client() -> genai.Client:
@@ -45,17 +46,21 @@ TOOL_TIMEOUT_S = 5.0
 MAX_TOOL_CALLS = 3
 
 async def run_tool_safely(name: str, args: dict, trace):
-    with trace.span(f"tool:{name}"):
+    with trace.span(f"tool:{name}") as s:
         try:
             return await asyncio.wait_for(
                 handle_financial_function_call(name, args),
                 timeout=TOOL_TIMEOUT_S,
             )
         except asyncio.TimeoutError:
+            s.set_attribute("tool.outcome", "timeout")
+            s.set_status(Status(StatusCode.ERROR, f"Tool {name} timed out after {TOOL_TIMEOUT_S}s"))
             logger.warning(f"Tool {name} timed out after {TOOL_TIMEOUT_S}s")
             return {"error": "Tool execution timed out",
                     "details": f"Tool {name} did not complete within {TOOL_TIMEOUT_S} seconds. live data is unavailable."}
         except Exception as e:
+            s.set_attribute("tool.outcome", "error")
+            s.set_status(Status(StatusCode.ERROR, f"Error running tool {name}: {e}"))
             logger.error(f"Error running tool {name}: {e}")
             return {"error": str(e), "details": f"An error occurred while running tool {name}. , live data is unavailable."}
 
@@ -72,18 +77,20 @@ async def process_gemini_response(session_id: str, transcript: str, chat, websoc
 
     trace.mark("llm_request_sent")
 
-    
-    response = chat.send_message_stream(transcript)
-    for chunk in response:
-        trace.mark("llm_first_chunk")
-        if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
-            for part in chunk.candidates[0].content.parts:
-                if part.function_call:
-                    function_calls.append({"name": part.function_call.name,
-                                           "arguments": dict(part.function_call.args)})
-                elif part.text and not getattr(part, "thought", False):
-                    final_text += part.text
-    trace.mark("llm_done")
+    with trace.span("llm.generate", {"llm.model": config.CHAT_MODEL, "lmmodel": config.CHAT_MODEL}) as s:
+        response = chat.send_message_stream(transcript)
+        for chunk in response:
+            trace.mark("llm_first_chunk")
+            if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
+                for part in chunk.candidates[0].content.parts:
+                    if part.function_call:
+                        function_calls.append({"name": part.function_call.name,
+                                            "arguments": dict(part.function_call.args)})
+                    elif part.text and not getattr(part, "thought", False):
+                        final_text += part.text
+
+        s.set_attribute("llm.function_calls", len(function_calls))
+        trace.mark("llm_done")
 
     if function_calls:
         requested = len(function_calls)
@@ -100,16 +107,17 @@ async def process_gemini_response(session_id: str, transcript: str, chat, websoc
             context += f"\n(Only the first {len(function_calls)} of {requested} requested lookups were run.)"
 
         trace.mark("llm2_request_sent")
-        final_response = chat.send_message_stream(context)
-        pieces = []
-        for chunk in final_response:
-            trace.mark("llm2_first_chunk")
-            if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
-                for part in chunk.candidates[0].content.parts:
-                    if part.text and not getattr(part, "thought", False):
-                        pieces.append(part.text)
-        final_text = "".join(pieces)
-        trace.mark("llm2_done")
+        with trace.span("llm.generate_after_tools"):
+            final_response = chat.send_message_stream(context)
+            pieces = []
+            for chunk in final_response:
+                trace.mark("llm2_first_chunk")
+                if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
+                    for part in chunk.candidates[0].content.parts:
+                        if part.text and not getattr(part, "thought", False):
+                            pieces.append(part.text)
+            final_text = "".join(pieces)
+            trace.mark("llm2_done")
 
     final_text = final_text.strip() or "Sorry, I couldn't get that. Could you try again?"
     logger.info(f"Gemini final response for session {session_id}: {final_text[:200]}")

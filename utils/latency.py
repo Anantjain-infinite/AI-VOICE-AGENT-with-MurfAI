@@ -1,6 +1,7 @@
 import json, time
 from contextlib import contextmanager
 from utils.logger import logger
+from utils.telemetry import tracer
 
 
 class TurnTrace:
@@ -32,13 +33,14 @@ class TurnTrace:
         self.marks.setdefault(name, time.perf_counter() if t is None else t)
 
     @contextmanager
-    def span(self, name: str):
+    def span(self, name: str, attrs: dict | None = None):
         start = time.perf_counter()
-        try:
-            yield
-        finally:
-            self.spans.append({"name": name,
-                               "ms": round((time.perf_counter() - start) * 1000, 1)})
+        with tracer.start_as_current_span(name, attributes=attrs or {}) as otel_span:
+            try:
+                yield otel_span
+            finally:
+                self.spans.append({"name": name,
+                                "ms": round((time.perf_counter() - start) * 1000, 1)})
 
     def _gap(self, a: str, b: str):
         if a in self.marks and b in self.marks:
