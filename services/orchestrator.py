@@ -13,7 +13,11 @@ from google.genai import types
 import config
 from services.skills import tools, handle_financial_function_call
 from services.memory.memory_store import get_facts
+from utils.llm_tracing import content, usage_details
 from utils.logger import logger
+from langfuse import get_client
+
+
 
 BASE_SYSTEM_PROMPT = """You are a helpful, concise voice assistant.
 
@@ -50,14 +54,19 @@ async def run_tool_calling_turn(client: genai.Client, conversation_text: str, us
     function calls Gemini requests, then get the final grounded response.
     Used by the plain HTTP /agent/chat route.
     """
-    response = client.models.generate_content(
-        model=config.CHAT_MODEL,
-        contents=conversation_text,
-        config=types.GenerateContentConfig(
-            system_instruction=build_system_instruction(user_id),
-            tools=[tools],
-        ),
-    )
+    lf = get_client()
+    with lf.start_as_current_observation(as_type="generation", name="gemini.http", model=config.CHAT_MODEL, input=content(conversation_text)
+    ) as obs:
+        response = client.models.generate_content(
+            model=config.CHAT_MODEL,
+            contents=conversation_text,
+            config=types.GenerateContentConfig(
+                system_instruction=build_system_instruction(user_id),
+                tools=[tools],
+            ),
+        )
+        obs.update(output=content(response.text),
+                   usage_details=usage_details(response.usage_metadata))
 
     function_calls = []
     for candidate in response.candidates:
@@ -77,10 +86,12 @@ async def run_tool_calling_turn(client: genai.Client, conversation_text: str, us
         f"- {r['function_name']}: {json.dumps(r['result']) if not isinstance(r['result'], str) else r['result']}"
         for r in results
     )
-
-    final_response = client.models.generate_content(
-        model=config.CHAT_MODEL,
-        contents=f"{conversation_text}\n\n{tool_context}",
-        config=types.GenerateContentConfig(system_instruction=build_system_instruction(user_id)),
-    )
+    with lf.start_as_current_observation(as_type="generation", name="gemini.http.final", model=config.CHAT_MODEL, input=content(f"{conversation_text}\n\n{tool_context}")) as obs:
+        final_response = client.models.generate_content(
+            model=config.CHAT_MODEL,
+            contents=f"{conversation_text}\n\n{tool_context}",
+            config=types.GenerateContentConfig(system_instruction=build_system_instruction(user_id)),
+        )
+        obs.update(output=content(final_response.text),
+                   usage_details=usage_details(final_response.usage_metadata))
     return final_response.text or ""

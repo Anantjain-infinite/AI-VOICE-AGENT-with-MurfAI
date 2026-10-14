@@ -11,6 +11,8 @@ from services.db import get_conn
 from services.session_store import get_full_history
 from services.memory.memory_store import add_fact
 from utils.logger import logger
+from langfuse import get_client
+from utils.llm_tracing import content, usage_details
 
 _EXTRACTION_PROMPT = """Extract durable facts about the user from this conversation snippet.
 Only include facts that would still be useful to remember in a future, unrelated conversation
@@ -29,10 +31,14 @@ def extract_facts_from_text(conversation_text: str) -> list[str]:
         return []
     try:
         client = genai.Client()
-        response = client.models.generate_content(
-            model=config.CHAT_MODEL,
-            contents=_EXTRACTION_PROMPT.format(conversation=conversation_text),
-        )
+        lf = get_client()
+        with lf.start_as_current_observation(as_type="generation", name="gemini.memory.extraction", model=config.CHAT_MODEL, input=content(conversation_text)) as obs:
+            response = client.models.generate_content(
+                model=config.CHAT_MODEL,
+                contents=_EXTRACTION_PROMPT.format(conversation=conversation_text),
+            )
+        obs.update(output=content(response.text),
+                   usage_details=usage_details(response.usage_metadata))
         raw = response.text.strip()
         if raw.startswith("```"):
             raw = raw.strip("`")

@@ -9,7 +9,7 @@ import uuid
 import asyncio
 from utils.latency import TurnTrace
 from utils.telemetry import init_tracing, shutdown_tracing, tracer
-
+from langfuse import get_client
 import config
 from schema import (
     TTSRequest, TTSResponse, ChatResponse,
@@ -55,6 +55,7 @@ async def health_check():
 @app.on_event("startup")
 def on_startup():
     init_tracing()
+    get_client()
     db.init_db()
     logger.info("Database initialized")
 

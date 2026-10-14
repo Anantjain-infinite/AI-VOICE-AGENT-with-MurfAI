@@ -26,7 +26,8 @@ import config
 from utils.logger import logger
 from utils.latency import TurnTrace
 from opentelemetry.trace import Status, StatusCode
-
+from langfuse import get_client
+from utils.llm_tracing import content, usage_details
 
 def init_gemini_client() -> genai.Client:
     return genai.Client()
@@ -67,6 +68,9 @@ async def run_tool_safely(name: str, args: dict, trace):
 
 async def process_gemini_response(session_id: str, transcript: str, chat, websocket, stream_tts_fn, trace = None):
 
+
+    lf = get_client()
+
     trace = trace or TurnTrace(session_id, -1)
 
     with trace.span("db_write_user"):
@@ -78,17 +82,32 @@ async def process_gemini_response(session_id: str, transcript: str, chat, websoc
     trace.mark("llm_request_sent")
 
     with trace.span("llm.generate", {"llm.model": config.CHAT_MODEL, "lmmodel": config.CHAT_MODEL}) as s:
-        response = chat.send_message_stream(transcript)
-        for chunk in response:
-            trace.mark("llm_first_chunk")
-            if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
-                for part in chunk.candidates[0].content.parts:
-                    if part.function_call:
-                        function_calls.append({"name": part.function_call.name,
-                                            "arguments": dict(part.function_call.args)})
-                    elif part.text and not getattr(part, "thought", False):
-                        final_text += part.text
 
+        with lf.start_as_current_observation(
+            as_type="generation",
+            name="gemini.chat",
+            model=config.CHAT_MODEL,
+            input=content(transcript)) as gen:
+            response = chat.send_message_stream(transcript)
+            last_usage = None
+            for chunk in response:
+                if chunk.usage_metadata:
+                    last_usage = chunk.usage_metadata
+                trace.mark("llm_first_chunk")
+                if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
+                    for part in chunk.candidates[0].content.parts:
+                        if part.function_call:
+                            function_calls.append({"name": part.function_call.name,
+                                                "arguments": dict(part.function_call.args)})
+                        elif part.text and not getattr(part, "thought", False):
+                            final_text += part.text
+
+            gen.update(
+                output={"text": content(final_text), "function_calls": [fc["name"] for fc in function_calls]},
+                usage_details=usage_details(last_usage)
+            )
+
+        logger.info(f"Usage: {last_usage}")
         s.set_attribute("llm.function_calls", len(function_calls))
         trace.mark("llm_done")
 
@@ -108,15 +127,27 @@ async def process_gemini_response(session_id: str, transcript: str, chat, websoc
 
         trace.mark("llm2_request_sent")
         with trace.span("llm.generate_after_tools"):
-            final_response = chat.send_message_stream(context)
-            pieces = []
-            for chunk in final_response:
-                trace.mark("llm2_first_chunk")
-                if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
-                    for part in chunk.candidates[0].content.parts:
-                        if part.text and not getattr(part, "thought", False):
-                            pieces.append(part.text)
-            final_text = "".join(pieces)
+            last_usage2 = None
+            with lf.start_as_current_observation(
+                name="gemini.chat_after_tools",
+                as_type="generation",
+                model=config.CHAT_MODEL,
+                input=content(context)) as gen2:
+                final_response = chat.send_message_stream(context)
+                pieces = []
+                for chunk in final_response:
+                    trace.mark("llm2_first_chunk")
+                    if chunk.usage_metadata:
+                        last_usage2 = chunk.usage_metadata
+                    if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
+                        for part in chunk.candidates[0].content.parts:
+                            if part.text and not getattr(part, "thought", False):
+                                pieces.append(part.text)
+                final_text = "".join(pieces)
+                gen2.update(
+                    output={"text": content(final_text)},
+                    usage_details=usage_details(last_usage2)
+                )
             trace.mark("llm2_done")
 
     final_text = final_text.strip() or "Sorry, I couldn't get that. Could you try again?"

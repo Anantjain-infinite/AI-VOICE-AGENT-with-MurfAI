@@ -7,6 +7,10 @@ from google.genai import types
 import config
 from services.rag.vector_store import query_chunks
 from utils.logger import logger
+from langfuse import get_client
+from utils.llm_tracing import content, usage_details
+
+
 
 _SYSTEM_INSTRUCTION = (
     "You are a document Q&A assistant. Answer the question using ONLY the "
@@ -33,12 +37,16 @@ def rag_answer(session_id: str, question: str) -> dict:
     prompt = f"Context:\n{context}\n\nQuestion: {question}"
 
     try:
+        lf = get_client()
         client = genai.Client()
-        response = client.models.generate_content(
-            model=config.CHAT_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION),
-        )
+        with lf.start_as_current_observation(as_type="generation", name="gemini.rag", model=config.CHAT_MODEL, input=content(prompt)) as obs:    
+            response = client.models.generate_content(
+                model=config.CHAT_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION),
+            )
+            obs.update(output=content(response.text),
+                       usage_details=usage_details(response.usage_metadata))
         answer_text = response.text
     except Exception as e:
         logger.error(f"RAG generation failed: {e}")
